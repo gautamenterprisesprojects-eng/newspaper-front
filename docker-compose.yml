@@ -1,0 +1,162 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: newspaper_pg_primary
+    restart: always
+    environment:
+      POSTGRES_USER: ${DB_USER:-postgres_admin}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-EnterpriseNewspaperSecret2026}
+      POSTGRES_DB: ${DB_NAME:-newspaper_erp_db}
+      TZ: UTC
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+      # migrations_v2 is the schema the running API actually uses; the older
+      # backend/migrations tree describes an unimplemented ERP and must not be
+      # seeded here. The API also applies these itself on boot.
+      - ./backend/migrations_v2:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-postgres_admin} -d ${DB_NAME:-newspaper_erp_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - portal-tier
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4G
+
+  redis:
+    image: redis:7-alpine
+    container_name: newspaper_redis_cache
+    restart: always
+    command: redis-server --save 60 1 --loglevel warning --requirepass "${REDIS_PASSWORD:-RedisSecureToken2026}" --maxmemory 2gb --maxmemory-policy noeviction
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-RedisSecureToken2026}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - portal-tier
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: newspaper_api_server
+    restart: always
+    environment:
+      APP_ENV: production
+      PORT: 8080
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-postgres_admin}
+      DB_PASS: ${DB_PASSWORD:-EnterpriseNewspaperSecret2026}
+      DB_NAME: ${DB_NAME:-newspaper_erp_db}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASS: ${REDIS_PASSWORD:-RedisSecureToken2026}
+      # JWT_SECRET is the key the API actually signs access tokens with. Without
+      # it the API generates an ephemeral key and sessions die on every restart.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set for the API to issue stable access tokens}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-https://portal.newspaper-erp.com}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID:-rzp_test_enterprise_id}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET:-rzp_test_enterprise_secret}
+      RAZORPAY_WEBHOOK_SECRET: ${RAZORPAY_WEBHOOK_SECRET:-rzp_webhook_secure_hash}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-cloudflare_r2_account_id}
+      R2_ACCESS_KEY: ${R2_ACCESS_KEY:-cloudflare_r2_access_key}
+      R2_SECRET_KEY: ${R2_SECRET_KEY:-cloudflare_r2_secret_key}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME:-enterprise-newspaper-portal}
+      GENERATOR_ENGINE_URL: ${GENERATOR_ENGINE_URL:-http://external-generator-service:5000/generate}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - portal-tier
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.worker
+    container_name: newspaper_async_worker
+    restart: always
+    environment:
+      APP_ENV: production
+      WORKER_CONCURRENCY: 20
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-postgres_admin}
+      DB_PASS: ${DB_PASSWORD:-EnterpriseNewspaperSecret2026}
+      DB_NAME: ${DB_NAME:-newspaper_erp_db}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASS: ${REDIS_PASSWORD:-RedisSecureToken2026}
+      R2_ACCOUNT_ID: ${R2_ACCOUNT_ID:-cloudflare_r2_account_id}
+      R2_ACCESS_KEY: ${R2_ACCESS_KEY:-cloudflare_r2_access_key}
+      R2_SECRET_KEY: ${R2_SECRET_KEY:-cloudflare_r2_secret_key}
+      R2_BUCKET_NAME: ${R2_BUCKET_NAME:-enterprise-newspaper-portal}
+      GENERATOR_ENGINE_URL: ${GENERATOR_ENGINE_URL:-http://external-generator-service:5000/generate}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - portal-tier
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Build-time, not runtime: Next.js inlines NEXT_PUBLIC_* into the bundle.
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://portal.newspaper-erp.com/api/v1}
+    container_name: newspaper_ui_portal
+    restart: always
+    depends_on:
+      - backend
+    networks:
+      - portal-tier
+
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: newspaper_nginx_proxy
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - nginx_logs:/var/log/nginx
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backend
+      - frontend
+    networks:
+      - portal-tier
+
+volumes:
+  pg_data:
+  redis_data:
+  nginx_logs:
+
+networks:
+  portal-tier:
+    driver: bridge

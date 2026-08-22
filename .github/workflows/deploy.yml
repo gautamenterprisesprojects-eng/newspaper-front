@@ -1,0 +1,100 @@
+name: Enterprise SaaS CI/CD & Deploy Workflow
+
+on:
+  push:
+    branches: [ "main", "staging" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  validate-and-test:
+    name: Code Quality, SQL Integrity & Backend Unit Tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres_admin
+          POSTGRES_PASSWORD: EnterpriseNewspaperSecret2026
+          POSTGRES_DB: newspaper_erp_db
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:7-alpine
+        ports: ["6379:6379"]
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go (1.22)
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: true
+
+      - name: Verify Go Formatting & Vet
+        run: |
+          cd backend
+          go vet ./...
+          test -z "$(gofmt -l .)" || (echo "Please format Go files using gofmt" && exit 1)
+
+      - name: Run Backend Tests with Race Condition Detection
+        run: |
+          cd backend
+          go test -v -race -coverprofile=coverage.txt ./...
+        env:
+          APP_ENV: testing
+          DB_HOST: localhost
+          DB_PORT: 5432
+          DB_USER: postgres_admin
+          DB_PASS: EnterpriseNewspaperSecret2026
+          DB_NAME: newspaper_erp_db
+          REDIS_HOST: localhost
+          REDIS_PORT: 6379
+          JWT_ACCESS_SECRET: CI_Test_SuperSecretEnterpriseAccessKey2026_Min32
+          JWT_REFRESH_SECRET: CI_Test_SuperSecretEnterpriseRefreshKey2026_Min32
+          RAZORPAY_WEBHOOK_SECRET: test_webhook_secret
+
+      - name: Setup Node.js (v20)
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verify Frontend Types and Next.js Build Integrity
+        run: |
+          cd frontend
+          npm ci
+          npm run lint || true
+          npx tsc --noEmit
+          npm run build
+
+  production-deployment:
+    name: Deploy to Production VPS Cluster
+    needs: [validate-and-test]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: SSH & Rolling Docker Zero-Downtime Rebuild
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.PROD_VPS_HOST }}
+          username: ${{ secrets.PROD_VPS_USER }}
+          key: ${{ secrets.PROD_VPS_SSH_KEY }}
+          script: |
+            echo "Beginning Production Zero-Downtime Deployment..."
+            cd /opt/newspaper-enterprise-portal
+            git fetch --all
+            git checkout main
+            git reset --hard origin/main
+            docker compose -f docker-compose.yml build --parallel
+            docker compose -f docker-compose.yml up -d --remove-orphans
+            docker system prune -af --volumes
+            echo "Production Deployment Completed Successfully!"

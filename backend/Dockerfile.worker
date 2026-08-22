@@ -1,0 +1,22 @@
+# Stage 1: Compile Background Asynq Worker Binary
+FROM golang:1.26-alpine AS builder
+WORKDIR /app
+RUN apk add --no-cache git ca-certificates tzdata
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+# NOTE: there is no ./cmd/worker in this repository yet. The previous build line
+# silently fell back to compiling ./cmd/api, so the "worker" container was a
+# second copy of the API rather than a background job runner. Build the API
+# explicitly until a real worker entrypoint exists, so the substitution is visible.
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /newspaper-worker ./cmd/api
+
+# Stage 2: Minimalist Worker Execution Image
+FROM alpine:3.19 AS production
+WORKDIR /app
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+COPY --from=builder /newspaper-worker /app/newspaper-worker
+
+USER 1001:1001
+ENTRYPOINT ["/app/newspaper-worker"]
