@@ -275,22 +275,30 @@ func SaaSRequestAccess(c *fiber.Ctx) error {
 // --- 2. SETUP WIZARD & PUBLISHER PROFILE ---
 
 func SaaSCompleteWizard(c *fiber.Ctx) error {
+	type EditorialAuthorInput struct {
+		Name     string `json:"name"`
+		ImageURL string `json:"image_url"`
+	}
+
 	var body struct {
-		PublisherID          string              `json:"publisher_id"`
-		PublisherName        string              `json:"publisher_name"`
-		NewspaperName        string              `json:"newspaper_name"`
-		PublicationType      string              `json:"publication_type"`
-		NumberOfEditions     int                 `json:"number_of_editions"`
-		DefaultPageCount     string              `json:"default_page_count"`
-		City                 string              `json:"city"`
-		State                string              `json:"state"`
-		Mobile               string              `json:"mobile"`
-		Email                string              `json:"email"`
-		FrontPageHeaderURL   string              `json:"front_page_header_url"`
-		RemainingPageHeadURL string              `json:"remaining_page_header_url"`
-		CoverPrice           string              `json:"cover_price"`
-		PublicationStartYear int                 `json:"publication_start_year"`
-		PageSections         []PageSectionConfig `json:"page_sections"`
+		PublisherID          string                 `json:"publisher_id"`
+		PublisherName        string                 `json:"publisher_name"`
+		NewspaperName        string                 `json:"newspaper_name"`
+		PublicationType      string                 `json:"publication_type"`
+		NumberOfEditions     int                    `json:"number_of_editions"`
+		DefaultPageCount     string                 `json:"default_page_count"`
+		City                 string                 `json:"city"`
+		State                string                 `json:"state"`
+		Mobile               string                 `json:"mobile"`
+		Email                string                 `json:"email"`
+		FrontPageHeaderURL   string                 `json:"front_page_header_url"`
+		RemainingPageHeadURL string                 `json:"remaining_page_header_url"`
+		CoverPrice           string                 `json:"cover_price"`
+		PublicationStartYear int                    `json:"publication_start_year"`
+		EditorialAuthorName  string                 `json:"editorial_author_name"`
+		EditorialAuthorImage string                 `json:"editorial_author_image_url"`
+		EditorialAuthors     []EditorialAuthorInput `json:"editorial_authors"`
+		PageSections         []PageSectionConfig    `json:"page_sections"`
 		// One-time baseline for volume auto-increment (see nextVolumeNumber):
 		// "my last edition was Volume LastVolumeNumber, dated LastPublishedDate."
 		// Optional — a publisher who leaves this blank just doesn't get
@@ -317,10 +325,30 @@ func SaaSCompleteWizard(c *fiber.Ctx) error {
 		if body.LastPublishedDate != "" {
 			lastPublishedDate = body.LastPublishedDate
 		}
+		authors := make([]EditorialAuthorInput, 0, len(body.EditorialAuthors))
+		for _, author := range body.EditorialAuthors {
+			author.Name = strings.TrimSpace(author.Name)
+			author.ImageURL = strings.TrimSpace(author.ImageURL)
+			if author.Name == "" && author.ImageURL == "" {
+				continue
+			}
+			authors = append(authors, author)
+		}
+		if len(authors) == 0 && (strings.TrimSpace(body.EditorialAuthorName) != "" || strings.TrimSpace(body.EditorialAuthorImage) != "") {
+			authors = append(authors, EditorialAuthorInput{
+				Name:     strings.TrimSpace(body.EditorialAuthorName),
+				ImageURL: strings.TrimSpace(body.EditorialAuthorImage),
+			})
+		}
+		if len(authors) > 0 {
+			body.EditorialAuthorName = authors[0].Name
+			body.EditorialAuthorImage = authors[0].ImageURL
+		}
+		authorsJSON, _ := json.Marshal(authors)
 
 		_, err := database.DB.Exec(`
-			INSERT INTO publisher_profiles (publisher_id, publisher_name, newspaper_name, publication_type, number_of_editions, default_page_count, city, state, mobile, email, front_page_header_url, remaining_page_header_url, cover_price, publication_start_year, page_section_config, last_volume_number, last_published_date, is_setup_completed)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15::jsonb, $16, $17, TRUE)
+			INSERT INTO publisher_profiles (publisher_id, publisher_name, newspaper_name, publication_type, number_of_editions, default_page_count, city, state, mobile, email, front_page_header_url, remaining_page_header_url, cover_price, publication_start_year, editorial_author_name, editorial_author_image_url, editorial_authors, page_section_config, last_volume_number, last_published_date, is_setup_completed)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17::jsonb, $18::jsonb, $19, $20, TRUE)
 			ON CONFLICT (publisher_id) DO UPDATE SET
 				publisher_name = EXCLUDED.publisher_name,
 				newspaper_name = EXCLUDED.newspaper_name,
@@ -335,11 +363,14 @@ func SaaSCompleteWizard(c *fiber.Ctx) error {
 				remaining_page_header_url = EXCLUDED.remaining_page_header_url,
 				cover_price = EXCLUDED.cover_price,
 				publication_start_year = EXCLUDED.publication_start_year,
+				editorial_author_name = EXCLUDED.editorial_author_name,
+				editorial_author_image_url = EXCLUDED.editorial_author_image_url,
+				editorial_authors = EXCLUDED.editorial_authors,
 				page_section_config = EXCLUDED.page_section_config,
 				last_volume_number = COALESCE(EXCLUDED.last_volume_number, publisher_profiles.last_volume_number),
 				last_published_date = COALESCE(EXCLUDED.last_published_date, publisher_profiles.last_published_date),
 				is_setup_completed = TRUE`,
-			body.PublisherID, body.PublisherName, body.NewspaperName, body.PublicationType, body.NumberOfEditions, body.DefaultPageCount, body.City, body.State, body.Mobile, body.Email, body.FrontPageHeaderURL, body.RemainingPageHeadURL, body.CoverPrice, body.PublicationStartYear, pageSectionsJSON(body.PageSections, 8), body.LastVolumeNumber, lastPublishedDate,
+			body.PublisherID, body.PublisherName, body.NewspaperName, body.PublicationType, body.NumberOfEditions, body.DefaultPageCount, body.City, body.State, body.Mobile, body.Email, body.FrontPageHeaderURL, body.RemainingPageHeadURL, body.CoverPrice, body.PublicationStartYear, body.EditorialAuthorName, body.EditorialAuthorImage, string(authorsJSON), pageSectionsJSON(body.PageSections, 8), body.LastVolumeNumber, lastPublishedDate,
 		)
 		if err != nil {
 			return c.Status(500).JSON(fiber.Map{"error": "Database error persisting publisher setup: " + err.Error()})
@@ -385,6 +416,20 @@ func SaaSGetProfile(c *fiber.Ctx) error {
 				var sections []PageSectionConfig
 				if json.Unmarshal([]byte(v), &sections) == nil {
 					prof["page_sections"] = sections
+				}
+			}
+		}
+		if raw, ok := prof["editorial_authors"]; ok {
+			switch v := raw.(type) {
+			case []byte:
+				var authors []map[string]string
+				if json.Unmarshal(v, &authors) == nil {
+					prof["editorial_authors"] = authors
+				}
+			case string:
+				var authors []map[string]string
+				if json.Unmarshal([]byte(v), &authors) == nil {
+					prof["editorial_authors"] = authors
 				}
 			}
 		}

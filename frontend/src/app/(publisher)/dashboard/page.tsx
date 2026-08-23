@@ -102,8 +102,16 @@ function getIssueNumber(value: string, date: string) {
 
 function getPageKindLabel(kind: string) {
   if (kind === "front") return "Front page";
+  if (kind === "editorial") return "Editorial page";
   if (kind === "advertisement") return "Advertisement page";
   return "Normal page";
+}
+
+function getGeneratorPageKind(pageNumber: number, section?: PageSection | null) {
+  if (pageNumber === 1) return "front";
+  if (section?.header_type === "advertisement") return "advertisement";
+  if (isEditorialSection(section?.section) || section?.header_type === "editorial") return "editorial";
+  return "normal";
 }
 
 // Caps how many individual mini-pages the "पूरा अखबार बनाएं" hero card
@@ -381,7 +389,8 @@ export default function PublisherDashboard() {
     if (pageNumber) {
       params.set("selectedPageNumber", String(pageNumber));
       params.set("selectedPageName", section?.section || `Page ${pageNumber}`);
-      params.set("pageKind", pageNumber === 1 ? "front" : section?.header_type === "advertisement" ? "advertisement" : "normal");
+      params.set("pageKind", getGeneratorPageKind(pageNumber, section));
+      params.set("autoOpenLayoutWizard", "true");
     }
     if (chargeOnExport) {
       params.set("chargeOnExport", "single");
@@ -406,7 +415,7 @@ export default function PublisherDashboard() {
   const openSinglePageWithoutDebit = (pageNumber: number) => {
     const finalDate = publicationDate || today();
     const finalIssueNumber = getIssueNumber(issueNumber, finalDate);
-    openGenerator("single", 1, finalIssueNumber, pageNumber, true);
+    openGenerator("single", defaultPages, finalIssueNumber, pageNumber, true);
   };
 
   const startBatchGeneration = (pageCount: number, finalIssueNumber: string, frontTemplateIndex?: number) => {

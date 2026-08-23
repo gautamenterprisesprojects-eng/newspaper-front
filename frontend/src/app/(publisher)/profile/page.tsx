@@ -4,6 +4,7 @@ import React, { useEffect, useState } from "react";
 import { apiFetch, getPublisherId } from "@/lib/api";
 
 type PageSection = { page_number: number; section: string; header_type: string; notes: string; category: string };
+type EditorialAuthor = { name: string; image_url: string; imageName?: string };
 
 // Must be byte-identical to NEWSWIRE_CATEGORIES in the generator
 // (src/lib/newswire.ts) — the generator reads page_sections[].category
@@ -84,6 +85,16 @@ const readFileAsDataUrl = (file: File) =>
     reader.readAsDataURL(file);
   });
 
+const emptyEditorialAuthor = (): EditorialAuthor => ({ name: "", image_url: "" });
+
+const cleanEditorialAuthors = (authors: EditorialAuthor[]) =>
+  authors
+    .map((author) => ({
+      name: author.name.trim(),
+      image_url: author.image_url.trim(),
+    }))
+    .filter((author) => author.name || author.image_url);
+
 export default function PublisherProfilePage() {
   const [publisherName, setPublisherName] = useState("");
   const [newspaperName, setNewspaperName] = useState("");
@@ -103,6 +114,7 @@ export default function PublisherProfilePage() {
   const [remainingHeaderUrl, setRemainingHeaderUrl] = useState("");
   const [frontHeaderName, setFrontHeaderName] = useState("");
   const [insideHeaderName, setInsideHeaderName] = useState("");
+  const [editorialAuthors, setEditorialAuthors] = useState<EditorialAuthor[]>([emptyEditorialAuthor()]);
   const [pageSections, setPageSections] = useState<PageSection[]>(defaultSections(8));
   const [pagePlanLocked, setPagePlanLocked] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
@@ -126,6 +138,24 @@ export default function PublisherProfilePage() {
       setLastPublishedDate(d.last_published_date ? String(d.last_published_date).slice(0, 10) : "");
       setFrontHeaderUrl(d.front_page_header_url || "");
       setRemainingHeaderUrl(d.remaining_page_header_url || "");
+      const savedAuthors = Array.isArray(d.editorial_authors)
+        ? d.editorial_authors
+            .map((author: { name?: string; image_url?: string }) => ({
+              name: String(author?.name || ""),
+              image_url: String(author?.image_url || ""),
+            }))
+            .filter((author: EditorialAuthor) => author.name || author.image_url)
+        : [];
+      if (savedAuthors.length > 0) {
+        setEditorialAuthors(savedAuthors);
+      } else if (d.editorial_author_name || d.editorial_author_image_url) {
+        setEditorialAuthors([
+          {
+            name: d.editorial_author_name || "",
+            image_url: d.editorial_author_image_url || "",
+          },
+        ]);
+      }
       if (Array.isArray(d.page_sections) && d.page_sections.length) {
         setPageSections(
           d.page_sections.map((p: PageSection) => ({
@@ -164,6 +194,18 @@ export default function PublisherProfilePage() {
     }
   };
 
+  const updateEditorialAuthor = (index: number, patch: Partial<EditorialAuthor>) => {
+    setEditorialAuthors((current) =>
+      current.map((author, authorIndex) => authorIndex === index ? { ...author, ...patch } : author),
+    );
+  };
+
+  const handleEditorialAuthorImageUpload = async (index: number, file: File | undefined) => {
+    if (!file) return;
+    const dataUrl = await readFileAsDataUrl(file);
+    updateEditorialAuthor(index, { image_url: dataUrl, imageName: file.name });
+  };
+
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
     const publisherId = getPublisherId();
@@ -173,6 +215,8 @@ export default function PublisherProfilePage() {
     }
     setSaving(true);
     try {
+      const cleanedAuthors = cleanEditorialAuthors(editorialAuthors);
+      const primaryAuthor = cleanedAuthors[0] ?? { name: "", image_url: "" };
       const res = await apiFetch("/publisher/wizard-complete", {
         method: "POST",
         body: JSON.stringify({
@@ -188,6 +232,9 @@ export default function PublisherProfilePage() {
           email,
           front_page_header_url: frontHeaderUrl,
           remaining_page_header_url: remainingHeaderUrl,
+          editorial_author_name: primaryAuthor.name,
+          editorial_author_image_url: primaryAuthor.image_url,
+          editorial_authors: cleanedAuthors,
           cover_price: coverPrice,
           publication_start_year: parseInt(startYear, 10) || 0,
           last_volume_number: lastVolumeNumber.trim() ? parseInt(lastVolumeNumber, 10) : null,
@@ -215,6 +262,72 @@ export default function PublisherProfilePage() {
       {pagePlanLocked && <div className="p-4 rounded-lg bg-yellow-50 border border-yellow-200 text-sm font-medium text-yellow-900">Page count और page plan अब lock है. बदलाव के लिए admin से contact करें.</div>}
 
       <div className="grid lg:grid-cols-2 gap-5">
+        <section className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="font-bold text-gray-950">Editorial authors</h2>
+              <p className="text-xs text-gray-500 mt-1">Editorial page banate waqt in saved authors me se author choose hoga.</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setEditorialAuthors((current) => [...current, emptyEditorialAuthor()])}
+              className="rounded-lg border border-gray-300 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
+            >
+              Add author
+            </button>
+          </div>
+
+          <div className="space-y-4">
+            {editorialAuthors.map((author, index) => (
+              <div key={index} className="rounded-xl border border-gray-200 bg-gray-50 p-3 space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-xs font-bold uppercase tracking-wide text-gray-500">Author {index + 1}</span>
+                  {editorialAuthors.length > 1 ? (
+                    <button
+                      type="button"
+                      onClick={() => setEditorialAuthors((current) => current.filter((_, authorIndex) => authorIndex !== index))}
+                      className="text-xs font-semibold text-red-600"
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                </div>
+                <input
+                  value={author.name}
+                  onChange={(e) => updateEditorialAuthor(index, { name: e.target.value })}
+                  placeholder="Author / editor name"
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white"
+                />
+                <div className="flex gap-4 items-start">
+                  <div className="h-28 w-24 shrink-0 overflow-hidden rounded-lg border border-gray-200 bg-white">
+                    {author.image_url ? (
+                      <img src={author.image_url} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center px-2 text-center text-xs text-gray-400">No photo</div>
+                    )}
+                  </div>
+                  <div className="flex-1 space-y-2">
+                    <label className="w-full border border-dashed border-gray-300 bg-white rounded-lg px-3 py-3 text-sm flex items-center justify-between cursor-pointer">
+                      <span>{author.imageName ? author.imageName : author.image_url ? "Photo uploaded" : "Upload author photo"}</span>
+                      <span className="text-xs font-semibold text-gray-600 whitespace-nowrap">Choose</span>
+                      <input type="file" accept="image/*" hidden onChange={(e) => void handleEditorialAuthorImageUpload(index, e.target.files?.[0])} />
+                    </label>
+                    {author.image_url ? (
+                      <button
+                        type="button"
+                        onClick={() => updateEditorialAuthor(index, { image_url: "", imageName: "" })}
+                        className="text-xs font-semibold text-red-600"
+                      >
+                        Remove photo
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-4">
           <h2 className="font-bold text-gray-950">अखबार की जानकारी</h2>
           <input value={publisherName} onChange={(e) => setPublisherName(e.target.value)} placeholder="पब्लिशर / संपादक का नाम" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
