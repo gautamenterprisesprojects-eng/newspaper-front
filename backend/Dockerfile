@@ -12,18 +12,22 @@ RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags="-s -w" -o /newspape
 # Stage 2: Production Lightweight Execution Image
 FROM alpine:3.19 AS production
 WORKDIR /app
+
+# Publisher credential PDFs (pkg/creds) are rendered via a headless
+# Chromium-family browser (see pdf.go's findBrowser/renderHTMLToPDF, which
+# already passes --no-sandbox for exactly this containerized-root-less
+# scenario) -- without it, /saas-admin/publishers/create,
+# /saas-admin/request/approve, and /saas-admin/publishers/:id/reset-password
+# all fail outright, since PDF generation runs before any DB write. The Noto
+# Devanagari font is required for the Hindi publisher/newspaper names on
+# that PDF to render as real glyphs instead of tofu boxes.
+RUN apk add --no-cache chromium font-noto ttf-dejavu \
+    && ln -sf /usr/lib/chromium/chrome /usr/bin/chromium 2>/dev/null || true
+
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=builder /newspaper-api /app/newspaper-api
 COPY ./migrations_v2 /app/migrations_v2
-
-# KNOWN GAP: publisher credential PDFs (pkg/creds) are rendered via a locally
-# installed Chromium-family browser (see pkg/creds/pdf.go), needed for correct
-# Devanagari text shaping. This Alpine image does not include one, so
-# /saas-admin/request/approve and /saas-admin/publishers/:id/reset-password
-# will fail here until a headless-capable Chromium is added to this image
-# (e.g. `apk add chromium` plus its required shared libraries and appropriate
-# --no-sandbox handling) or those calls are routed to a service that has one.
 
 EXPOSE 8080
 USER 1001:1001
