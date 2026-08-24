@@ -69,6 +69,26 @@ type PageSectionConfig struct {
 	HeaderType string `json:"header_type"`
 	Notes      string `json:"notes"`
 	Category   string `json:"category"`
+	// Categories is the multi-select replacement for Category (a publisher
+	// can now mix e.g. Sports + Business on one page). Category is kept in
+	// sync as Categories[0] so older callers (and the generator's fallback
+	// single-category read) that only understand the scalar keep working.
+	Categories []string `json:"categories"`
+}
+
+// normalizePageSectionCategories fills in whichever of Category/Categories
+// is missing so every caller can rely on both being populated, regardless of
+// whether the row was written before or after the multi-category settings
+// feature.
+func normalizePageSectionCategories(sections []PageSectionConfig) []PageSectionConfig {
+	for i, s := range sections {
+		if len(s.Categories) == 0 && strings.TrimSpace(s.Category) != "" {
+			sections[i].Categories = []string{s.Category}
+		} else if len(s.Categories) > 0 && s.Category == "" {
+			sections[i].Category = s.Categories[0]
+		}
+	}
+	return sections
 }
 
 func defaultPageSections(pageCount int) []PageSectionConfig {
@@ -354,19 +374,24 @@ func SaaSCompleteWizard(c *fiber.Ctx) error {
 				newspaper_name = EXCLUDED.newspaper_name,
 				publication_type = EXCLUDED.publication_type,
 				number_of_editions = EXCLUDED.number_of_editions,
-				default_page_count = EXCLUDED.default_page_count,
+				-- default_page_count, the header URLs, and page_section_config are
+				-- seeded here only until the one-time Settings page (SaaSSaveSettings)
+				-- takes ownership of them; once settings_locked is TRUE this profile
+				-- save (still used for mobile/email/masthead fields) must not clobber
+				-- what Settings configured.
+				default_page_count = CASE WHEN publisher_profiles.settings_locked THEN publisher_profiles.default_page_count ELSE EXCLUDED.default_page_count END,
 				city = EXCLUDED.city,
 				state = EXCLUDED.state,
 				mobile = EXCLUDED.mobile,
 				email = EXCLUDED.email,
-				front_page_header_url = EXCLUDED.front_page_header_url,
-				remaining_page_header_url = EXCLUDED.remaining_page_header_url,
+				front_page_header_url = CASE WHEN publisher_profiles.settings_locked THEN publisher_profiles.front_page_header_url ELSE EXCLUDED.front_page_header_url END,
+				remaining_page_header_url = CASE WHEN publisher_profiles.settings_locked THEN publisher_profiles.remaining_page_header_url ELSE EXCLUDED.remaining_page_header_url END,
 				cover_price = EXCLUDED.cover_price,
 				publication_start_year = EXCLUDED.publication_start_year,
 				editorial_author_name = EXCLUDED.editorial_author_name,
 				editorial_author_image_url = EXCLUDED.editorial_author_image_url,
 				editorial_authors = EXCLUDED.editorial_authors,
-				page_section_config = EXCLUDED.page_section_config,
+				page_section_config = CASE WHEN publisher_profiles.settings_locked THEN publisher_profiles.page_section_config ELSE EXCLUDED.page_section_config END,
 				last_volume_number = COALESCE(EXCLUDED.last_volume_number, publisher_profiles.last_volume_number),
 				last_published_date = COALESCE(EXCLUDED.last_published_date, publisher_profiles.last_published_date),
 				is_setup_completed = TRUE`,
@@ -410,12 +435,26 @@ func SaaSGetProfile(c *fiber.Ctx) error {
 			case []byte:
 				var sections []PageSectionConfig
 				if json.Unmarshal(v, &sections) == nil {
-					prof["page_sections"] = sections
+					prof["page_sections"] = normalizePageSectionCategories(sections)
 				}
 			case string:
 				var sections []PageSectionConfig
 				if json.Unmarshal([]byte(v), &sections) == nil {
-					prof["page_sections"] = sections
+					prof["page_sections"] = normalizePageSectionCategories(sections)
+				}
+			}
+		}
+		if raw, ok := prof["editions"]; ok {
+			switch v := raw.(type) {
+			case []byte:
+				var editions []PublisherEdition
+				if json.Unmarshal(v, &editions) == nil {
+					prof["editions"] = editions
+				}
+			case string:
+				var editions []PublisherEdition
+				if json.Unmarshal([]byte(v), &editions) == nil {
+					prof["editions"] = editions
 				}
 			}
 		}
@@ -435,6 +474,116 @@ func SaaSGetProfile(c *fiber.Ctx) error {
 		}
 	}
 	return c.JSON(prof)
+}
+
+// PublisherEdition is one entry in a publisher's one-time edition setup
+// (e.g. "Bhopal Edition", "Jabalpur Edition"), each with its own front/inside
+// masthead artwork. Index 0 doubles as the legacy single-edition header pair
+// for publishers who never set up multiple editions.
+type PublisherEdition struct {
+	Name            string `json:"name"`
+	FrontHeaderURL  string `json:"front_header_url"`
+	InsideHeaderURL string `json:"inside_header_url"`
+}
+
+// SaaSSaveSettings persists the publisher's one-time settings: editions
+// (with per-edition headers), a brand theme color, and the page plan (page
+// count plus, per page, a free-form name and a multi-category selection).
+// It is deliberately separate from SaaSCompleteWizard, which only seeds a
+// minimal profile at signup.
+//
+// This is a true one-time write: once settings_locked is TRUE the update is
+// rejected server-side (not just disabled in the UI, unlike the older page
+// count/plan freeze in SaaSCompleteWizard/profile page). Only
+// SaaSAdminUnlockSettings can clear the flag again.
+func SaaSSaveSettings(c *fiber.Ctx) error {
+	var body struct {
+		PublisherID  string              `json:"publisher_id"`
+		ThemeColor   string              `json:"theme_color"`
+		Editions     []PublisherEdition  `json:"editions"`
+		PageSections []PageSectionConfig `json:"page_sections"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid settings payload."})
+	}
+
+	publisherID, ok := authorizedPublisherID(c, body.PublisherID)
+	if !ok {
+		return nil // rejection response already written
+	}
+	body.PublisherID = publisherID
+
+	if len(body.PageSections) == 0 {
+		return c.Status(400).JSON(fiber.Map{"error": "At least one page is required in the page plan."})
+	}
+
+	editions := make([]PublisherEdition, 0, len(body.Editions))
+	for _, ed := range body.Editions {
+		ed.Name = strings.TrimSpace(ed.Name)
+		ed.FrontHeaderURL = strings.TrimSpace(ed.FrontHeaderURL)
+		ed.InsideHeaderURL = strings.TrimSpace(ed.InsideHeaderURL)
+		if ed.Name == "" && ed.FrontHeaderURL == "" && ed.InsideHeaderURL == "" {
+			continue
+		}
+		editions = append(editions, ed)
+	}
+	if len(editions) == 0 {
+		return c.Status(400).JSON(fiber.Map{"error": "At least one edition is required."})
+	}
+	editionsJSON, _ := json.Marshal(editions)
+
+	sections := normalizePageSectionCategories(body.PageSections)
+	sectionsJSON := pageSectionsJSON(sections, len(sections))
+
+	if database.DB == nil {
+		return c.Status(503).JSON(fiber.Map{"error": "Database unavailable."})
+	}
+
+	var alreadyLocked bool
+	if err := database.DB.Get(&alreadyLocked, "SELECT settings_locked FROM publisher_profiles WHERE publisher_id = $1", body.PublisherID); err != nil {
+		return c.Status(404).JSON(fiber.Map{"error": "Publisher profile not found. Complete the setup wizard first."})
+	}
+	if alreadyLocked {
+		return c.Status(403).JSON(fiber.Map{"error": "Settings are already locked. Ask an admin to unlock them before changing."})
+	}
+
+	res, err := database.DB.Exec(`
+		UPDATE publisher_profiles
+		SET theme_color = $1, editions = $2::jsonb, page_section_config = $3::jsonb,
+			default_page_count = $4, settings_locked = TRUE, updated_at = NOW()
+		WHERE publisher_id = $5 AND settings_locked = FALSE`,
+		strings.TrimSpace(body.ThemeColor), string(editionsJSON), sectionsJSON, strconv.Itoa(len(sections)), body.PublisherID,
+	)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Database error persisting settings: " + err.Error()})
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return c.Status(403).JSON(fiber.Map{"error": "Settings are already locked. Ask an admin to unlock them before changing."})
+	}
+
+	return c.JSON(fiber.Map{"success": true, "settings_locked": true, "message": "Settings saved and locked. Contact an admin to change them."})
+}
+
+// SaaSAdminUnlockSettings lets an admin clear settings_locked so a publisher
+// can go through their one-time settings page again. This is the only way
+// to change locked settings — there is no direct admin-side edit form by
+// design, to keep a single source of truth for the settings UI.
+func SaaSAdminUnlockSettings(c *fiber.Ctx) error {
+	publisherID := c.Params("publisher_id")
+	if publisherID == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "publisher_id is required."})
+	}
+	if database.DB == nil {
+		return c.Status(503).JSON(fiber.Map{"error": "Database unavailable."})
+	}
+	res, err := database.DB.Exec("UPDATE publisher_profiles SET settings_locked = FALSE, updated_at = NOW() WHERE publisher_id = $1", publisherID)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed unlocking settings."})
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return c.Status(404).JSON(fiber.Map{"error": "Publisher profile not found."})
+	}
+	return c.JSON(fiber.Map{"success": true, "message": "Settings unlocked. The publisher can now resubmit their settings."})
 }
 
 type ManualArticleInput struct {
@@ -1406,7 +1555,7 @@ func SaaSAdminOverview(c *fiber.Ctx) error {
 	}
 
 	publishers, err := database.QueryMaps(`
-		SELECT p.id, p.username, p.is_active, p.created_at, p.password_encrypted, COALESCE(w.balance_inr, 0) as balance_inr, pp.newspaper_name, pp.publisher_name, pp.email, pp.mobile
+		SELECT p.id, p.username, p.is_active, p.created_at, p.password_encrypted, COALESCE(w.balance_inr, 0) as balance_inr, pp.newspaper_name, pp.publisher_name, pp.email, pp.mobile, COALESCE(pp.settings_locked, FALSE) as settings_locked
 		FROM publishers p
 		LEFT JOIN wallets w ON p.id = w.publisher_id
 		LEFT JOIN publisher_profiles pp ON p.id = pp.publisher_id

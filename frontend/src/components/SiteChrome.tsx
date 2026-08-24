@@ -5,7 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 
 const ADMIN_PREFIXES = ["/saas-admin", "/system-health"];
-const PUBLISHER_PREFIXES = ["/dashboard", "/wallet", "/history", "/profile"];
+const PUBLISHER_PREFIXES = ["/dashboard", "/wallet", "/history", "/profile", "/settings"];
 
 export default function SiteChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();

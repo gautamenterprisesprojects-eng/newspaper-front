@@ -11,6 +11,7 @@ interface Publisher {
   balance_inr: string | number;
   is_active: boolean;
   password: string | null;
+  settings_locked: boolean;
 }
 
 function randomPassword(prefix = "Pub") {
@@ -75,6 +76,18 @@ export default function AdminPublishersPage() {
     `${p.username} ${p.newspaper_name} ${p.publisher_name}`.toLowerCase().includes(search.toLowerCase()),
   );
 
+  const unlockSettings = async (pub: Publisher) => {
+    if (!window.confirm(`${pub.newspaper_name || pub.username} की settings unlock करें? इसके बाद वो publisher दोबारा settings भर सकेगा.`)) return;
+    const res = await apiFetch(`/saas-admin/publishers/${pub.id}/unlock-settings`, { method: "POST" });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) {
+      setToast(data?.error || "Settings unlock नहीं हो सकीं.");
+      return;
+    }
+    setToast("Settings unlock हो गईं.");
+    load();
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -120,6 +133,9 @@ export default function AdminPublishersPage() {
                   <button onClick={() => downloadCredentials(pub)} className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-semibold">PDF</button>
                   <button onClick={() => setWalletPub(pub)} className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-semibold">Wallet</button>
                   <button onClick={() => setResetPub(pub)} className="px-3 py-1.5 rounded-lg bg-black text-white text-xs font-semibold">Password</button>
+                  {pub.settings_locked && (
+                    <button onClick={() => unlockSettings(pub)} className="px-3 py-1.5 rounded-lg border border-amber-400 bg-amber-50 text-amber-800 text-xs font-semibold">Unlock settings</button>
+                  )}
                 </td>
               </tr>
             ))}

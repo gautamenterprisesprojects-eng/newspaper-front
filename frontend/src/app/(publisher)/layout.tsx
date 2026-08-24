@@ -10,6 +10,7 @@ const NAV = [
   { name: "वॉलेट", href: "/wallet" },
   { name: "पुराने अंक", href: "/history" },
   { name: "प्रोफाइल", href: "/profile" },
+  { name: "सेटिंग्स", href: "/settings" },
 ];
 
 function initials(name: string) {

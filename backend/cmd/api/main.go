@@ -79,6 +79,7 @@ func main() {
 	pub := app.Group("/api/v1/publisher", middleware.ZeroTrustAuth())
 	pub.Post("/wizard-complete", handlers.SaaSCompleteWizard)
 	pub.Get("/profile/:publisher_id", handlers.SaaSGetProfile)
+	pub.Post("/settings", handlers.SaaSSaveSettings)
 	pub.Get("/wallet/:publisher_id", handlers.SaaSGetWallet)
 	pub.Post("/wallet/recharge", handlers.SaaSSimulateRecharge)
 	pub.Post("/generator/calculate", handlers.SaaSPreCalculate)
@@ -107,6 +108,7 @@ func main() {
 	admin.Get("/publishers/:publisher_id/credentials-pdf", handlers.SaaSAdminDownloadCredentialsPDF)
 	admin.Post("/publishers/:publisher_id/wallet-adjust", handlers.SaaSAdminWalletAdjust)
 	admin.Post("/publishers/:publisher_id/reset-password", handlers.SaaSAdminResetPassword)
+	admin.Post("/publishers/:publisher_id/unlock-settings", handlers.SaaSAdminUnlockSettings)
 
 	// Graceful Shutdown Protocol
 	go func() {

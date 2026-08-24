@@ -9,7 +9,7 @@ import { YouthUpdateMastheadTeasersPanel } from "./YouthUpdateMastheadTeasersPan
 import { YouthUpdateInsideAuthorPanel } from "./YouthUpdateInsideAuthorPanel";
 
 type GenerateMode = "full" | "single";
-type PageSection = { page_number: number; section: string; header_type: string; notes?: string; category?: string };
+type PageSection = { page_number: number; section: string; header_type: string; notes?: string; category?: string; categories?: string[] };
 
 type BatchPageStatus = "pending" | "ready" | "error";
 type BatchPageState = {
@@ -237,6 +237,8 @@ export default function PublisherDashboard() {
     setIsYouthUpdatePublisher(getPublisherId() === YOUTH_UPDATE_PUBLISHER_ID);
   }, []);
   const [pageSections, setPageSections] = useState<PageSection[]>([]);
+  const [editions, setEditions] = useState<{ name: string }[]>([]);
+  const [selectedEditionIndex, setSelectedEditionIndex] = useState(0);
   const [batchActive, setBatchActive] = useState(false);
   const [batchSrc, setBatchSrc] = useState<string | null>(null);
   const [batchPages, setBatchPages] = useState<BatchPageState[]>([]);
@@ -279,6 +281,7 @@ export default function PublisherDashboard() {
           setSelectedPageNumber((current) => Math.min(Math.max(1, current), pages));
         }
         if (Array.isArray(d?.page_sections) && d.page_sections.length) setPageSections(d.page_sections);
+        if (Array.isArray(d?.editions) && d.editions.length) setEditions(d.editions);
         if (d?.last_volume_number !== undefined && d?.last_volume_number !== null) setVolumeNumber(Number(d.last_volume_number));
       })
       .catch(() => {});
@@ -385,6 +388,7 @@ export default function PublisherDashboard() {
       apiBase: API_BASE,
       authToken: getToken() || "",
       pageSections: JSON.stringify(pageSections),
+      editionIndex: String(selectedEditionIndex),
     });
     if (pageNumber) {
       params.set("selectedPageNumber", String(pageNumber));
@@ -629,6 +633,20 @@ export default function PublisherDashboard() {
             <p className="mt-1.5 text-xs text-gray-500">पिछला अंक: Volume {volumeNumber} — अगला अंक बनाने पर यह अपने आप बढ़ेगा।</p>
           )}
         </div>
+        {editions.length > 1 && (
+          <div className="sm:col-span-2">
+            <label className="block text-xs font-semibold text-gray-700 mb-1.5">एडिशन</label>
+            <select
+              value={selectedEditionIndex}
+              onChange={(e) => setSelectedEditionIndex(parseInt(e.target.value, 10) || 0)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+            >
+              {editions.map((ed, i) => (
+                <option key={i} value={i}>{ed.name || `एडिशन ${i + 1}`}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </div>
 
       {isYouthUpdatePublisher && pageSetupFor !== null ? (
