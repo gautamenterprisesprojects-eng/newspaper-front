@@ -1,7 +1,9 @@
 package middleware
 
 import (
+	"crypto/sha256"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -59,6 +61,10 @@ func ZeroTrustAuth() fiber.Handler {
 		}, jwt.WithValidMethods([]string{"HS256"}))
 
 		if err != nil || !token.Valid {
+			// TEMP DEBUG
+			secret := config.JWTSecret()
+			sum := sha256.Sum256(secret)
+			log.Printf("[AUTH-DEBUG] parse err=%v valid=%v secretLen=%d secretSHA256=%x", err, token.Valid, len(secret), sum)
 			errorCode := "ERR_TOKEN_INVALID"
 			message := "Access token is invalid"
 			if strings.Contains(strings.ToLower(fmt.Sprint(err)), "expired") {
