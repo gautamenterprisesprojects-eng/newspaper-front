@@ -5,7 +5,11 @@ WORKDIR /app
 
 FROM base AS deps
 COPY package.json package-lock.json* ./
-RUN npm ci
+# --legacy-peer-deps: next@15.0.0's declared peer range predates react@19
+# stable, which this project already runs on (see package.json) -- the
+# lockfile itself resolves fine, `npm ci` just refuses without this flag,
+# same as the local dev install already needed.
+RUN npm ci --legacy-peer-deps
 
 FROM base AS builder
 WORKDIR /app
