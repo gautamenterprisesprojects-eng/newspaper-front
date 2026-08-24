@@ -109,6 +109,7 @@ func main() {
 	admin.Post("/publishers/:publisher_id/wallet-adjust", handlers.SaaSAdminWalletAdjust)
 	admin.Post("/publishers/:publisher_id/reset-password", handlers.SaaSAdminResetPassword)
 	admin.Post("/publishers/:publisher_id/unlock-settings", handlers.SaaSAdminUnlockSettings)
+	admin.Post("/publishers/:publisher_id/set-active", handlers.SaaSAdminSetPublisherActive)
 
 	// Graceful Shutdown Protocol
 	go func() {

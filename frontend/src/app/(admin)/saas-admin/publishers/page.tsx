@@ -76,6 +76,23 @@ export default function AdminPublishersPage() {
     `${p.username} ${p.newspaper_name} ${p.publisher_name}`.toLowerCase().includes(search.toLowerCase()),
   );
 
+  const toggleActive = async (pub: Publisher) => {
+    const nextActive = !pub.is_active;
+    const verb = nextActive ? "reactivate" : "suspend";
+    if (!window.confirm(`${pub.newspaper_name || pub.username} को ${nextActive ? "फिर से सक्रिय" : "निलंबित"} करें?`)) return;
+    const res = await apiFetch(`/saas-admin/publishers/${pub.id}/set-active`, {
+      method: "POST",
+      body: JSON.stringify({ is_active: nextActive }),
+    });
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data?.success) {
+      setToast(data?.error || `Publisher ${verb} नहीं हो सका.`);
+      return;
+    }
+    setToast(nextActive ? "Publisher फिर से सक्रिय हो गया." : "Publisher निलंबित कर दिया गया.");
+    load();
+  };
+
   const unlockSettings = async (pub: Publisher) => {
     if (!window.confirm(`${pub.newspaper_name || pub.username} की settings unlock करें? इसके बाद वो publisher दोबारा settings भर सकेगा.`)) return;
     const res = await apiFetch(`/saas-admin/publishers/${pub.id}/unlock-settings`, { method: "POST" });
@@ -127,12 +144,26 @@ export default function AdminPublishersPage() {
                   <div className="font-semibold">{pub.newspaper_name || "-"}</div>
                   <div className="text-xs text-gray-500">{pub.publisher_name || "-"}</div>
                 </td>
-                <td className="px-5 py-4">{pub.is_active ? "Active" : "Inactive"}</td>
+                <td className="px-5 py-4">
+                  <span className={pub.is_active ? "text-green-700" : "text-red-700"}>
+                    {pub.is_active ? "Active" : "Suspended"}
+                  </span>
+                </td>
                 <td className="px-5 py-4 text-right font-mono">₹{Number(pub.balance_inr || 0).toFixed(2)}</td>
                 <td className="px-5 py-4 text-right space-x-2">
                   <button onClick={() => downloadCredentials(pub)} className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-semibold">PDF</button>
                   <button onClick={() => setWalletPub(pub)} className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-semibold">Wallet</button>
                   <button onClick={() => setResetPub(pub)} className="px-3 py-1.5 rounded-lg bg-black text-white text-xs font-semibold">Password</button>
+                  <button
+                    onClick={() => toggleActive(pub)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border ${
+                      pub.is_active
+                        ? "border-red-300 bg-red-50 text-red-700"
+                        : "border-green-300 bg-green-50 text-green-700"
+                    }`}
+                  >
+                    {pub.is_active ? "Suspend" : "Reactivate"}
+                  </button>
                   {pub.settings_locked && (
                     <button onClick={() => unlockSettings(pub)} className="px-3 py-1.5 rounded-lg border border-amber-400 bg-amber-50 text-amber-800 text-xs font-semibold">Unlock settings</button>
                   )}

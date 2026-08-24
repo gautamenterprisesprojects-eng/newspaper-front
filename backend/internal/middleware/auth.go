@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/enterprise/newspaper-portal-backend/internal/config"
+	"github.com/enterprise/newspaper-portal-backend/internal/database"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
 	"github.com/golang-jwt/jwt/v5"
@@ -72,8 +73,28 @@ func ZeroTrustAuth() fiber.Handler {
 			})
 		}
 
+		userID := stringClaim(claims, "sub")
+
+		// A signed, unexpired token alone isn't enough -- an admin suspending
+		// a publisher (setting is_active = false) needs that to take effect
+		// immediately, not wait out the token's own 72-hour expiry. One
+		// lightweight lookup per request; skipped only if the DB itself isn't
+		// up (matches the rest of this codebase's DB-optional dev fallback).
+		if database.DB != nil && userID != "" {
+			var isActive bool
+			err := database.DB.Get(&isActive, "SELECT is_active FROM publishers WHERE id = $1", userID)
+			if err != nil || !isActive {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+					"success":    false,
+					"error_code": "ERR_ACCOUNT_SUSPENDED",
+					"message":    "This account has been suspended or no longer exists",
+					"timestamp":  time.Now().UTC().Format(time.RFC3339),
+				})
+			}
+		}
+
 		// Inject the verified claims (never hardcoded identities) into context
-		c.Locals("userID", stringClaim(claims, "sub"))
+		c.Locals("userID", userID)
 		c.Locals("role", stringClaim(claims, "role"))
 		c.Locals("username", stringClaim(claims, "username"))
 

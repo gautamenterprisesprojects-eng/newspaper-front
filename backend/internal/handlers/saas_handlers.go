@@ -1973,6 +1973,36 @@ func SaaSAdminWalletAdjust(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"success": true, "balance_after_inr": newBal, "message": "Wallet balance updated."})
 }
 
+// SaaSAdminSetPublisherActive suspends or reactivates a publisher account.
+// Suspension takes effect immediately, not just on next login -- ZeroTrustAuth
+// re-checks is_active on every request, so an already-issued token stops
+// working right away rather than staying valid for its full 72-hour life.
+func SaaSAdminSetPublisherActive(c *fiber.Ctx) error {
+	publisherID := c.Params("publisher_id")
+	var body struct {
+		IsActive bool `json:"is_active"`
+	}
+	if err := c.BodyParser(&body); err != nil || publisherID == "" {
+		return c.Status(400).JSON(fiber.Map{"error": "publisher_id and is_active are required."})
+	}
+	if database.DB == nil {
+		return c.Status(503).JSON(fiber.Map{"error": "Database unavailable."})
+	}
+
+	result, err := database.DB.Exec(
+		"UPDATE publishers SET is_active = $1 WHERE id = $2 AND role = 'PUBLISHER'",
+		body.IsActive, publisherID,
+	)
+	if err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed updating account status."})
+	}
+	if affected, _ := result.RowsAffected(); affected == 0 {
+		return c.Status(404).JSON(fiber.Map{"error": "Publisher not found."})
+	}
+
+	return c.JSON(fiber.Map{"success": true, "is_active": body.IsActive})
+}
+
 // SaaSAdminResetPassword lets an admin set a new login password for a
 // publisher and issues a freshly locked credentials PDF reflecting it.
 func SaaSAdminResetPassword(c *fiber.Ctx) error {
