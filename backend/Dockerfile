@@ -29,6 +29,11 @@ COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=builder /newspaper-api /app/newspaper-api
 COPY ./migrations_v2 /app/migrations_v2
 
+# Chromium writes its profile/config dir under $HOME, which is otherwise
+# unset for this non-root user -- it then tries (and fails) to create
+# /.config, since /  isn't writable by uid 1001. /tmp is world-writable.
+ENV HOME=/tmp
+
 EXPOSE 8080
 USER 1001:1001
 ENTRYPOINT ["/app/newspaper-api"]
