@@ -24,15 +24,22 @@ WORKDIR /app
 RUN apk add --no-cache chromium font-noto ttf-dejavu \
     && ln -sf /usr/lib/chromium/chrome /usr/bin/chromium 2>/dev/null || true
 
+# Chromium resolves its profile/config directory via glib's getpwuid(), not
+# the $HOME env var -- uid 1001 had no /etc/passwd entry, so glib fell back
+# to "/" regardless of $HOME, and Chrome failed trying to mkdir /.config
+# (confirmed live: setting ENV HOME alone did not fix it). A real passwd
+# entry with a writable home directory fixes this at the source.
+RUN addgroup -g 1001 -S appuser \
+    && adduser -u 1001 -S -G appuser -h /home/appuser -s /sbin/nologin appuser \
+    && mkdir -p /home/appuser \
+    && chown -R appuser:appuser /home/appuser
+
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
 COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
 COPY --from=builder /newspaper-api /app/newspaper-api
 COPY ./migrations_v2 /app/migrations_v2
 
-# Chromium writes its profile/config dir under $HOME, which is otherwise
-# unset for this non-root user -- it then tries (and fails) to create
-# /.config, since /  isn't writable by uid 1001. /tmp is world-writable.
-ENV HOME=/tmp
+ENV HOME=/home/appuser
 
 EXPOSE 8080
 USER 1001:1001
