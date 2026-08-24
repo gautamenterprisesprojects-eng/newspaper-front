@@ -23,6 +23,11 @@ ENV NEXT_TELEMETRY_DISABLED 1
 ARG NEXT_PUBLIC_API_URL=http://localhost:8080/api/v1
 ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
+# Same story -- the dashboard hands off to the separate page-composition app
+# (D:\newspaper_generater) by URL, inlined at build time same as above.
+ARG NEXT_PUBLIC_GENERATOR_URL=http://localhost:3000
+ENV NEXT_PUBLIC_GENERATOR_URL=$NEXT_PUBLIC_GENERATOR_URL
+
 RUN npm run build
 
 FROM base AS runner

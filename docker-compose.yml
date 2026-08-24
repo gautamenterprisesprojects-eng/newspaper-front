@@ -134,6 +134,7 @@ services:
       args:
         # Build-time, not runtime: Next.js inlines NEXT_PUBLIC_* into the bundle.
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://portal.newspaper-erp.com/api/v1}
+        NEXT_PUBLIC_GENERATOR_URL: ${NEXT_PUBLIC_GENERATOR_URL:-http://localhost:3000}
     container_name: newspaper_ui_portal
     restart: always
     depends_on:
