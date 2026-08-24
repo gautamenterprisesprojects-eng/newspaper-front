@@ -22,10 +22,25 @@ BEGIN
     END IF;
 END $$;
 
+-- On a brand-new database, the table above (00009) already creates the
+-- composite PK directly -- there is no legacy single-column PK for the
+-- detection block above to drop, so this ADD would be redundant. Attempting
+-- it anyway raises "multiple primary keys ... are not allowed", which is a
+-- different error than duplicate_object and was going uncaught, crashing
+-- the whole initdb run. Skip outright when the table already has the target
+-- composite PK.
 DO $$
 BEGIN
-    ALTER TABLE youth_update_inside_author
-      ADD CONSTRAINT youth_update_inside_author_pkey PRIMARY KEY (publisher_id, slot_index);
+    IF NOT EXISTS (
+        SELECT 1
+          FROM pg_constraint c
+          JOIN pg_class t ON t.oid = c.conrelid
+         WHERE t.relname = 'youth_update_inside_author'
+           AND c.contype = 'p'
+    ) THEN
+        ALTER TABLE youth_update_inside_author
+          ADD CONSTRAINT youth_update_inside_author_pkey PRIMARY KEY (publisher_id, slot_index);
+    END IF;
 EXCEPTION WHEN duplicate_object THEN
     NULL;
 END $$;

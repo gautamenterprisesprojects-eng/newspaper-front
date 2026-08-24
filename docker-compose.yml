@@ -11,10 +11,13 @@ services:
       POSTGRES_DB: ${DB_NAME:-newspaper_erp_db}
       TZ: UTC
     ports:
-      # Loopback-only -- reachable for local psql/debugging on the VPS
-      # itself, never from the public internet. Other containers (backend,
-      # worker) reach it over the docker network by service name regardless.
-      - "127.0.0.1:5432:5432"
+      # Loopback-only, and remapped off the standard 5432 -- this VPS
+      # already runs a separate native (non-Docker) postgres on 5432 for an
+      # unrelated existing site. Other containers (backend, worker) reach
+      # this one over the docker network by service name on its real 5432
+      # regardless of the host-side port here, which exists purely for
+      # local psql/debugging on the VPS itself, never the public internet.
+      - "127.0.0.1:5433:5432"
     volumes:
       - pg_data:/var/lib/postgresql/data
       # migrations_v2 is the schema the running API actually uses; the older
