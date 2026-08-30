@@ -8,6 +8,18 @@ import { PageMintBadge } from "@/components/PageMintLogo";
 const ADMIN_PREFIXES = ["/saas-admin", "/system-health"];
 const PUBLISHER_PREFIXES = ["/dashboard", "/wallet", "/history", "/profile", "/settings"];
 
+// Nav link with a growing underline on hover (drawn as a real element, not a
+// pseudo-element) so it can pick up the brand's own emerald->teal gradient
+// instead of a flat single-colour rule.
+function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link href={href} className="group relative py-1 text-gray-600 hover:text-gray-950">
+      {children}
+      <span className="absolute -bottom-0.5 left-0 h-[2px] w-0 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 transition-all duration-300 group-hover:w-full" />
+    </Link>
+  );
+}
+
 export default function SiteChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isAdminRoute = ADMIN_PREFIXES.some((p) => pathname.startsWith(p));
@@ -17,23 +29,30 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
 
   return (
     <div className="min-h-screen bg-white text-gray-900">
-      <header className="sticky top-0 z-50 h-16 bg-white/90 backdrop-blur border-b border-gray-200">
+      <header className="sticky top-0 z-50 h-[72px] bg-white/95 backdrop-blur border-b border-gray-200">
         <div className="max-w-6xl mx-auto h-full px-4 sm:px-6 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-3">
-            <PageMintBadge size={36} />
-            <span className="font-extrabold tracking-tight text-gray-950">PageMint</span>
+            <PageMintBadge size={40} />
+            <span className="font-extrabold text-lg tracking-tight text-gray-950">PageMint</span>
           </Link>
-          <nav className="hidden md:flex items-center gap-6 text-sm font-semibold text-gray-600">
-            <Link href="/#features" className="hover:text-gray-950">सुविधाएं</Link>
-            <Link href="/#workflow" className="hover:text-gray-950">कैसे काम करता है</Link>
-            <Link href="/login" className="hover:text-gray-950">लॉगिन</Link>
+          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold">
+            <NavLink href="/#features">सुविधाएं</NavLink>
+            <NavLink href="/#workflow">कैसे काम करता है</NavLink>
           </nav>
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2 text-sm font-semibold text-white shadow-sm shadow-emerald-500/25 transition-all hover:from-emerald-500 hover:to-teal-500 hover:shadow-md hover:shadow-emerald-500/35"
-          >
-            पब्लिशर लॉगिन
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link
+              href="/login"
+              className="hidden sm:inline-flex items-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-gray-400 hover:bg-gray-50"
+            >
+              लॉगिन
+            </Link>
+            <Link
+              href="/login"
+              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-emerald-500/25 transition-all hover:from-emerald-500 hover:to-teal-500 hover:shadow-lg hover:shadow-emerald-500/35 hover:-translate-y-0.5"
+            >
+              पब्लिशर लॉगिन
+            </Link>
+          </div>
         </div>
       </header>
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">{children}</main>
