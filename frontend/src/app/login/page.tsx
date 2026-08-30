@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiFetch, saveSession } from "@/lib/api";
+import { PageMintBadge } from "@/components/PageMintLogo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -37,21 +38,26 @@ export default function LoginPage() {
     <div className="min-h-[70vh] flex items-center justify-center">
       <form onSubmit={handleLogin} className="w-full max-w-md bg-white border border-gray-200 rounded-xl shadow-sm p-8 space-y-5">
         <div className="text-center">
-          <div className="mx-auto h-12 w-12 rounded-lg bg-black text-white flex items-center justify-center font-bold text-xl">N</div>
+          <div className="mx-auto w-fit">
+            <PageMintBadge size={48} />
+          </div>
           <h1 className="mt-4 text-2xl font-bold text-gray-950">लॉगिन</h1>
           <p className="mt-1 text-sm text-gray-500">एडमिन से मिली यूज़र आईडी और पासवर्ड डालें.</p>
         </div>
         {errorMsg && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-medium text-center">{errorMsg}</div>}
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1.5">यूज़र आईडी</label>
-          <input value={username} onChange={(e) => setUsername(e.target.value)} required className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black" />
+          <input value={username} onChange={(e) => setUsername(e.target.value)} required className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
         </div>
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1.5">पासवर्ड</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-black" />
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
           <p className="mt-2 text-xs text-gray-500">पासवर्ड भूल गए हैं तो अपने एडमिन से नया पासवर्ड लें.</p>
         </div>
-        <button disabled={loading} className="w-full py-2.5 rounded-lg bg-black text-white text-sm font-semibold hover:bg-gray-800 disabled:opacity-50">
+        <button
+          disabled={loading}
+          className="w-full py-2.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-sm font-semibold shadow-md shadow-emerald-500/25 transition-all hover:from-emerald-500 hover:to-teal-500 hover:shadow-lg hover:shadow-emerald-500/35 disabled:opacity-50"
+        >
           {loading ? "जांच हो रही है..." : "लॉगिन करें"}
         </button>
       </form>

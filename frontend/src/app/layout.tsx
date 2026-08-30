@@ -20,7 +20,7 @@ const hind = Hind({
 });
 
 export const metadata = {
-  title: "न्यूज़पेपर मैनेजर",
+  title: "PageMint",
   description: "पब्लिशर, वॉलेट और न्यूज़पेपर जनरेटर को मैनेज करने वाला पोर्टल.",
 };
 

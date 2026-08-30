@@ -132,3 +132,105 @@ body {
   background-size: 300% 300%;
   animation: card-gradient-drift 8s ease-in-out infinite;
 }
+
+/* Public landing page ("PageMint" masthead redesign) -- staggered hero
+   entrance, the live "LIVE जनरेशन" pulse dot, the front-page mock's photo
+   shimmer sweep, its gentle float, the printed-rule draw-in under the
+   headline, and the breaking-news ticker's marquee scroll. Named landing-*
+   (not reused elsewhere) so this section can be found and removed as one
+   block if the page is ever redesigned again. */
+@keyframes landing-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-landing-fade-up {
+  animation: landing-fade-up 0.8s ease forwards;
+}
+
+@keyframes landing-draw-line {
+  to {
+    width: 84px;
+  }
+}
+
+.animate-landing-draw-line {
+  width: 0;
+  animation: landing-draw-line 0.9s cubic-bezier(0.22, 0.9, 0.3, 1) forwards;
+  animation-delay: 0.55s;
+}
+
+@keyframes landing-pulse-ring {
+  0% {
+    transform: scale(0.8);
+    opacity: 0.7;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
+}
+
+.animate-landing-pulse-ring {
+  animation: landing-pulse-ring 2.2s ease-out infinite;
+}
+
+@keyframes landing-float-card {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+.animate-landing-float-card {
+  animation: landing-float-card 6s ease-in-out infinite;
+}
+
+@keyframes landing-shimmer {
+  0% {
+    background-position: -120% 0;
+  }
+  100% {
+    background-position: 220% 0;
+  }
+}
+
+.animate-landing-shimmer {
+  animation: landing-shimmer 3.4s ease-in-out infinite;
+}
+
+@keyframes landing-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.animate-landing-blink {
+  animation: landing-blink 1.4s ease-in-out infinite;
+}
+
+@keyframes landing-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-landing-marquee {
+  animation: landing-marquee 26s linear infinite;
+}
