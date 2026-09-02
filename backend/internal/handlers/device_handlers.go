@@ -217,10 +217,17 @@ type DeviceDecision struct {
 // CheckLoginDevice runs after the password has been verified. It never
 // reveals which of the several failure reasons applied -- the caller returns
 // one generic refusal -- but records the precise reason for the admin panel.
+//
+// The kill switch governs ENFORCEMENT ONLY, never enrolment. Binding has to
+// keep working while the gate is off, because that is the whole shape of the
+// rollout: every account is enrolled first, and only once everyone is bound
+// does the gate come on. Short-circuiting the entire function on the switch
+// made that impossible -- nobody could enrol until the gate was already
+// enforcing, which is precisely the lockout the staged rollout exists to
+// avoid. Found by running the enrolment end to end rather than reasoning
+// about it: the login succeeded and set no cookie at all.
 func CheckLoginDevice(c *fiber.Ctx, publisherID, role string) DeviceDecision {
-	if !DeviceGateEnabled() {
-		return DeviceDecision{Allowed: true, Status: "SUCCESS"}
-	}
+	gateOn := DeviceGateEnabled()
 
 	// An already-enrolled browser.
 	if device, ok := lookupLiveDevice(c.Cookies(deviceCookieName)); ok {
@@ -240,18 +247,21 @@ func CheckLoginDevice(c *fiber.Ctx, publisherID, role string) DeviceDecision {
 			}
 		}
 		// A publisher's browser reaching for a different account.
-		return DeviceDecision{Status: "DEVICE_BLOCKED"}
+		return DeviceDecision{Allowed: !gateOn, Status: "DEVICE_BLOCKED"}
 	}
 
 	// An unenrolled browser carrying a live one-time link.
 	enrolment, ok := lookupPendingEnrolment(c.Cookies(enrolCookieName))
 	if !ok {
+		if !gateOn {
+			return DeviceDecision{Allowed: true, Status: "SUCCESS"}
+		}
 		return DeviceDecision{Status: "DEVICE_BLOCKED"}
 	}
 	// Tokens are account-bound: a link issued for cliffdemo1 cannot enrol a
 	// browser against cliffdemo2, even with cliffdemo2's password.
 	if enrolment.PublisherID != publisherID {
-		return DeviceDecision{Status: "ENROLMENT_TOKEN_INVALID"}
+		return DeviceDecision{Allowed: !gateOn, Status: "ENROLMENT_TOKEN_INVALID"}
 	}
 
 	var liveCount int
@@ -259,22 +269,22 @@ func CheckLoginDevice(c *fiber.Ctx, publisherID, role string) DeviceDecision {
 		"SELECT COUNT(*) FROM account_devices WHERE publisher_id = $1 AND revoked_at IS NULL",
 		publisherID); err != nil {
 		log.Printf("device slot count failed for %s: %v", publisherID, err)
-		return DeviceDecision{Status: "DEVICE_BLOCKED"}
+		return DeviceDecision{Allowed: !gateOn, Status: "DEVICE_BLOCKED"}
 	}
 	if liveCount >= deviceSlotsFor(role) {
-		return DeviceDecision{Status: "DEVICE_SLOTS_FULL"}
+		return DeviceDecision{Allowed: !gateOn, Status: "DEVICE_SLOTS_FULL"}
 	}
 
 	secret, err := randomSecret()
 	if err != nil {
 		log.Printf("device secret generation failed: %v", err)
-		return DeviceDecision{Status: "DEVICE_BLOCKED"}
+		return DeviceDecision{Allowed: !gateOn, Status: "DEVICE_BLOCKED"}
 	}
 
 	tx, err := database.DB.Beginx()
 	if err != nil {
 		log.Printf("device binding transaction failed to start: %v", err)
-		return DeviceDecision{Status: "DEVICE_BLOCKED"}
+		return DeviceDecision{Allowed: !gateOn, Status: "DEVICE_BLOCKED"}
 	}
 	defer tx.Rollback()
 
@@ -285,7 +295,7 @@ func CheckLoginDevice(c *fiber.Ctx, publisherID, role string) DeviceDecision {
 		publisherID, hashSecret(secret), trustLevelFor(role), c.Get("User-Agent"), ClientIP(c),
 	).Scan(&deviceID); err != nil {
 		log.Printf("device binding insert failed for %s: %v", publisherID, err)
-		return DeviceDecision{Status: "DEVICE_BLOCKED"}
+		return DeviceDecision{Allowed: !gateOn, Status: "DEVICE_BLOCKED"}
 	}
 	// Spending the token inside the same transaction as the bind is what
 	// makes a one-time link genuinely one-time: two browsers racing the same
@@ -295,14 +305,14 @@ func CheckLoginDevice(c *fiber.Ctx, publisherID, role string) DeviceDecision {
 		deviceID, enrolment.ID)
 	if err != nil {
 		log.Printf("enrolment token spend failed: %v", err)
-		return DeviceDecision{Status: "DEVICE_BLOCKED"}
+		return DeviceDecision{Allowed: !gateOn, Status: "DEVICE_BLOCKED"}
 	}
 	if affected, _ := res.RowsAffected(); affected != 1 {
-		return DeviceDecision{Status: "ENROLMENT_TOKEN_INVALID"}
+		return DeviceDecision{Allowed: !gateOn, Status: "ENROLMENT_TOKEN_INVALID"}
 	}
 	if err := tx.Commit(); err != nil {
 		log.Printf("device binding commit failed: %v", err)
-		return DeviceDecision{Status: "DEVICE_BLOCKED"}
+		return DeviceDecision{Allowed: !gateOn, Status: "DEVICE_BLOCKED"}
 	}
 
 	setDeviceCookie(c, secret)
