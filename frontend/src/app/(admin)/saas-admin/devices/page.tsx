@@ -104,7 +104,16 @@ export default function AdminDevicesPage() {
         setLoadError(data?.error || "डिवाइस लिस्ट लोड नहीं हो सकी.");
         return;
       }
-      setAccounts(data.accounts || []);
+      // Defensive on both counts: a missing accounts array, and a null
+      // devices array inside any account. This screen is the tool for
+      // getting locked-out people back in, so it has to render even when
+      // the payload is not what it expects.
+      setAccounts(
+        (data.accounts || []).map((account: AccountDevices) => ({
+          ...account,
+          devices: account.devices || [],
+        })),
+      );
       setGateEnabled(Boolean(data.gate_enabled));
       setLoadError(null);
     } catch {

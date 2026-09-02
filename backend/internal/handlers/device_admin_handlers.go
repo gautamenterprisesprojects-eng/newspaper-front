@@ -99,7 +99,13 @@ func SaaSAdminListDevices(c *fiber.Ctx) error {
 		for i := range devices {
 			devices[i].IsCurrent = devices[i].ID == currentDeviceID
 		}
-		entry.Devices = devices
+		// sqlx leaves the slice nil when the query returns no rows, and a nil
+		// slice marshals to JSON null, not []. The panel then reads .length
+		// off null and the whole screen dies -- which it did for every
+		// account, since none had a device yet.
+		if devices != nil {
+			entry.Devices = devices
+		}
 		entry.SlotsUsed = len(devices)
 
 		var pending pendingLinkInfo
@@ -267,6 +273,13 @@ func SaaSAdminDeviceBlocks(c *fiber.Ctx) error {
 		Status    string    `db:"status" json:"status"`
 		LoginTime time.Time `db:"login_time" json:"login_time"`
 	}
+	rows = []struct {
+		Username  string    `db:"username" json:"username"`
+		IPAddress string    `db:"ip_address" json:"ip_address"`
+		UserAgent string    `db:"user_agent" json:"user_agent"`
+		Status    string    `db:"status" json:"status"`
+		LoginTime time.Time `db:"login_time" json:"login_time"`
+	}{}
 	if err := database.DB.Select(&rows,
 		`SELECT username, COALESCE(ip_address, '') AS ip_address, COALESCE(user_agent, '') AS user_agent,
 		        status, login_time
