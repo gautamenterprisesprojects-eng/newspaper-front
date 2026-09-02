@@ -8,17 +8,6 @@ import { PageMintBadge } from "@/components/PageMintLogo";
 const ADMIN_PREFIXES = ["/saas-admin", "/system-health"];
 const PUBLISHER_PREFIXES = ["/dashboard", "/wallet", "/history", "/profile", "/settings"];
 
-// Nav link with a growing underline on hover (drawn as a real element, not a
-// pseudo-element) so it can pick up the brand's own emerald->teal gradient
-// instead of a flat single-colour rule.
-function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
-  return (
-    <Link href={href} className="group relative py-1 text-gray-600 hover:text-gray-950">
-      {children}
-      <span className="absolute -bottom-0.5 left-0 h-[2px] w-0 rounded-full bg-gradient-to-r from-emerald-600 to-teal-600 transition-all duration-300 group-hover:w-full" />
-    </Link>
-  );
-}
 
 export default function SiteChrome({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -35,16 +24,12 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
             <PageMintBadge size={40} />
             <span className="font-extrabold text-lg tracking-tight text-gray-950">PageMint</span>
           </Link>
-          <nav className="hidden md:flex items-center gap-8 text-sm font-semibold">
-            <NavLink href="/#features">सुविधाएं</NavLink>
-            <NavLink href="/#workflow">कैसे काम करता है</NavLink>
-          </nav>
-          <Link
-            href="/login"
-            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-emerald-500/25 transition-all hover:from-emerald-500 hover:to-teal-500 hover:shadow-lg hover:shadow-emerald-500/35 hover:-translate-y-0.5"
-          >
-            पब्लिशर लॉगिन
-          </Link>
+          {/* The marketing nav (सुविधाएं / कैसे काम करता है) and the publisher
+              login CTA are gone with the landing page they pointed at: the
+              anchors #features/#workflow only ever existed on it, and the
+              root now redirects to /login, so the CTA would be a button
+              back to the page you are already on. Only the wordmark is
+              left, which doubles as that same "back to login" link. */}
         </div>
       </header>
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">{children}</main>
