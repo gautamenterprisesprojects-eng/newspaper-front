@@ -120,8 +120,16 @@ func SaaSAdminListDevices(c *fiber.Ctx) error {
 }
 
 // SaaSAdminIssueEnrolmentLink mints the one-time link an admin sends over
-// WhatsApp. Any link already outstanding for that account is cancelled, so
-// there is never more than one live link per account to keep track of.
+// WhatsApp.
+//
+// One link binds one browser, so a multi-slot account needs several live at
+// once: the shared admin account has four slots for two people's laptops and
+// phones, and cancelling the previous link on each issue would force those
+// four enrolments into a strict relay. Links are therefore allowed up to the
+// number of FREE slots. Only when none are free is the oldest outstanding
+// link cancelled to make room -- which is what "the publisher lost the link,
+// send another" needs, and it keeps the invariant that outstanding links can
+// never exceed the slots they could fill.
 //
 // The raw token is returned exactly once, here. Only its hash is stored, so
 // a link that gets lost cannot be recovered -- it has to be re-issued.
@@ -165,16 +173,33 @@ func SaaSAdminIssueEnrolmentLink(c *fiber.Ctx) error {
 	adminUsername, _ := c.Locals("username").(string)
 	expiresAt := time.Now().Add(enrolTokenTTL)
 
+	var outstanding int
+	if err := database.DB.Get(&outstanding,
+		`SELECT COUNT(*) FROM enrolment_tokens
+		 WHERE publisher_id = $1 AND used_at IS NULL AND cancelled_at IS NULL AND expires_at > NOW()`,
+		publisherID); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Could not count the outstanding links."})
+	}
+
 	tx, err := database.DB.Beginx()
 	if err != nil {
 		return c.Status(500).JSON(fiber.Map{"error": "Failed starting transaction."})
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Exec(
-		`UPDATE enrolment_tokens SET cancelled_at = NOW()
-		 WHERE publisher_id = $1 AND used_at IS NULL AND cancelled_at IS NULL`, publisherID); err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": "Could not cancel the previous link."})
+	// Room for another link only if a slot is still unspoken for. Otherwise
+	// the oldest outstanding one is retired so this new link can take its
+	// place -- the re-issue case.
+	if liveCount+outstanding >= deviceSlotsFor(account.Role) {
+		if _, err := tx.Exec(
+			`UPDATE enrolment_tokens SET cancelled_at = NOW()
+			 WHERE id = (
+				SELECT id FROM enrolment_tokens
+				WHERE publisher_id = $1 AND used_at IS NULL AND cancelled_at IS NULL
+				ORDER BY created_at LIMIT 1
+			 )`, publisherID); err != nil {
+			return c.Status(500).JSON(fiber.Map{"error": "Could not retire the previous link."})
+		}
 	}
 	if _, err := tx.Exec(
 		`INSERT INTO enrolment_tokens (publisher_id, token_hash, expires_at, created_by)
