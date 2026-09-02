@@ -39,20 +39,12 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
             <NavLink href="/#features">सुविधाएं</NavLink>
             <NavLink href="/#workflow">कैसे काम करता है</NavLink>
           </nav>
-          <div className="flex items-center gap-3">
-            <Link
-              href="/login"
-              className="hidden sm:inline-flex items-center rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-semibold text-gray-700 transition hover:border-gray-400 hover:bg-gray-50"
-            >
-              लॉगिन
-            </Link>
-            <Link
-              href="/login"
-              className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-emerald-500/25 transition-all hover:from-emerald-500 hover:to-teal-500 hover:shadow-lg hover:shadow-emerald-500/35 hover:-translate-y-0.5"
-            >
-              पब्लिशर लॉगिन
-            </Link>
-          </div>
+          <Link
+            href="/login"
+            className="inline-flex items-center gap-2 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-emerald-500/25 transition-all hover:from-emerald-500 hover:to-teal-500 hover:shadow-lg hover:shadow-emerald-500/35 hover:-translate-y-0.5"
+          >
+            पब्लिशर लॉगिन
+          </Link>
         </div>
       </header>
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">{children}</main>

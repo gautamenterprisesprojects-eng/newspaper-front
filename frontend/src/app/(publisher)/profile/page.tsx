@@ -1,7 +1,10 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { apiFetch, getPublisherId } from "@/lib/api";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { ChevronRight, LogOut } from "lucide-react";
+import { apiFetch, clearSession, getPublisherId } from "@/lib/api";
 
 type EditorialAuthor = { name: string; image_url: string; imageName?: string };
 
@@ -24,6 +27,7 @@ const cleanEditorialAuthors = (authors: EditorialAuthor[]) =>
     .filter((author) => author.name || author.image_url);
 
 export default function PublisherProfilePage() {
+  const router = useRouter();
   const [publisherName, setPublisherName] = useState("");
   const [newspaperName, setNewspaperName] = useState("");
   const [pubType, setPubType] = useState("Daily");
@@ -133,22 +137,22 @@ export default function PublisherProfilePage() {
   return (
     <form onSubmit={save} className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold text-gray-950">प्रोफाइल</h1>
+        <h1 className="page-title text-2xl font-bold">प्रोफाइल</h1>
         <p className="text-sm text-gray-600 mt-1">अखबार की जानकारी, मास्टहेड और editorial authors यहां set होते हैं.</p>
       </div>
       {toast && <div className="p-4 rounded-lg bg-gray-100 border border-gray-200 text-sm font-medium">{toast}</div>}
 
       <div className="grid lg:grid-cols-2 gap-5">
-        <section className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-4">
+        <section className="min-w-0 surface-card p-4 sm:p-6 space-y-4">
           <div className="flex items-start justify-between gap-4">
-            <div>
+            <div className="min-w-0">
               <h2 className="font-bold text-gray-950">Editorial authors</h2>
               <p className="text-xs text-gray-500 mt-1">Editorial page banate waqt in saved authors me se author choose hoga.</p>
             </div>
             <button
               type="button"
               onClick={() => setEditorialAuthors((current) => [...current, emptyEditorialAuthor()])}
-              className="rounded-lg border border-gray-300 px-3 py-2 text-xs font-bold text-gray-700 hover:bg-gray-50"
+              className="tap min-h-[40px] shrink-0 rounded-lg border border-gray-300 px-3.5 text-xs font-bold text-gray-700 hover:bg-gray-50 sm:min-h-0 sm:px-3 sm:py-2"
             >
               Add author
             </button>
@@ -183,10 +187,13 @@ export default function PublisherProfilePage() {
                       <div className="flex h-full w-full items-center justify-center px-2 text-center text-xs text-gray-400">No photo</div>
                     )}
                   </div>
-                  <div className="flex-1 space-y-2">
-                    <label className="w-full border border-dashed border-gray-300 bg-white rounded-lg px-3 py-3 text-sm flex items-center justify-between cursor-pointer">
-                      <span>{author.imageName ? author.imageName : author.image_url ? "Photo uploaded" : "Upload author photo"}</span>
-                      <span className="text-xs font-semibold text-gray-600 whitespace-nowrap">Choose</span>
+                  {/* min-w-0: a flex child defaults to min-width:auto, so the
+                      non-wrapping filename below would hold this column open
+                      past the card and push the page into horizontal scroll. */}
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <label className="tap-row flex w-full cursor-pointer items-center justify-between gap-2 rounded-lg border border-dashed border-gray-300 bg-white px-3 py-3 text-sm">
+                      <span className="min-w-0 truncate">{author.imageName ? author.imageName : author.image_url ? "Photo uploaded" : "Upload author photo"}</span>
+                      <span className="shrink-0 text-xs font-semibold text-gray-600 whitespace-nowrap">Choose</span>
                       <input type="file" accept="image/*" hidden onChange={(e) => void handleEditorialAuthorImageUpload(index, e.target.files?.[0])} />
                     </label>
                     {author.image_url ? (
@@ -205,7 +212,7 @@ export default function PublisherProfilePage() {
           </div>
         </section>
 
-        <section className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-4">
+        <section className="min-w-0 surface-card p-4 sm:p-6 space-y-4">
           <h2 className="font-bold text-gray-950">अखबार की जानकारी</h2>
           <input value={publisherName} onChange={(e) => setPublisherName(e.target.value)} placeholder="पब्लिशर / संपादक का नाम" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
           <input value={newspaperName} onChange={(e) => setNewspaperName(e.target.value)} placeholder="अखबार का नाम" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
@@ -219,7 +226,7 @@ export default function PublisherProfilePage() {
           <input value={mobile} onChange={(e) => setMobile(e.target.value)} placeholder="मोबाइल" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
         </section>
 
-        <section className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-4">
+        <section className="min-w-0 surface-card p-4 sm:p-6 space-y-4">
           <h2 className="font-bold text-gray-950">मास्टहेड</h2>
           <p className="text-xs text-gray-500 -mt-2">शहर, अंक मूल्य और आरंभ वर्ष हर अंक पर हेडर इमेज के ऊपर अपने आप छप जाते हैं — तारीख और दिन की तरह.</p>
           <input value={city} onChange={(e) => setCity(e.target.value)} placeholder="शहर (जैसे Bhopal)" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
@@ -255,7 +262,32 @@ export default function PublisherProfilePage() {
         </section>
       </div>
 
-      <button disabled={saving} className="px-5 py-2.5 rounded-lg bg-black text-white text-sm font-semibold disabled:opacity-50">{saving ? "सेव हो रहा है..." : "प्रोफाइल सेव करें"}</button>
+      <button disabled={saving} className="tap btn-brand rounded-xl px-5 py-3 text-sm font-semibold disabled:opacity-50 sm:rounded-lg sm:py-2.5">{saving ? "सेव हो रहा है..." : "प्रोफाइल सेव करें"}</button>
+
+      {/* Account actions. The desktop sidebar carries these, but it is hidden
+          on phones -- which left the setup wizard and, more importantly, log
+          out with no route to them at all on mobile. Profile is where people
+          look for account controls, so they live here below lg. */}
+      <section className="surface-card divide-y divide-gray-100 lg:hidden">
+        <Link
+          href="/wizard"
+          className="tap-row flex items-center justify-between gap-3 px-4 py-4 text-sm font-semibold text-gray-800"
+        >
+          सेटअप विज़ार्ड
+          <ChevronRight className="h-4 w-4 shrink-0 text-gray-400" />
+        </Link>
+        <button
+          type="button"
+          onClick={() => {
+            clearSession();
+            router.push("/login");
+          }}
+          className="tap-row flex w-full items-center justify-between gap-3 px-4 py-4 text-left text-sm font-semibold text-red-600"
+        >
+          लॉग आउट
+          <LogOut className="h-4 w-4 shrink-0" />
+        </button>
+      </section>
     </form>
   );
 }

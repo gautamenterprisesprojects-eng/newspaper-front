@@ -43,6 +43,204 @@ body {
   background: #6b7280;
 }
 
+/* ==========================================================================
+   Native-shell behaviour (WebView app)
+   This app ships as a WebView wrapped for the App Store / Play Store, so the
+   page has to stop behaving like a document: no pinch zoom, no rubber-band
+   overscroll revealing the browser's own background, no blue tap flash, no
+   text-selection lasso when a finger rests on a button. Everything below is
+   about removing those "this is a web page" tells. Anything that would hurt
+   a real desktop browser is scoped to (hover: none) / max-width.
+   ========================================================================== */
+
+@media (hover: none) and (pointer: coarse) {
+  .app-shell {
+    /* Kills the 300ms click delay and double-tap-to-zoom without disabling
+       scrolling the way touch-action: none would. */
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  /* Pull-to-refresh and the iOS scroll bounce both expose the host browser
+     and instantly break the illusion; contain stops the chain at the
+     document. Touch only -- on desktop this changes trackpad scroll
+     chaining, which nobody asked for. */
+  html,
+  body {
+    overscroll-behavior-y: contain;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
+  /* On touch, selection only ever happens by accident -- long-pressing a
+     button to "copy" it is never the intent. Inputs and real content opt back
+     in via .selectable below. */
+  .app-shell {
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  input,
+  textarea,
+  select,
+  [contenteditable="true"],
+  .selectable {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+
+  /* iOS zooms the viewport when a focused input's text is under 16px, and
+     never zooms back out. This is the fix -- not a preference. */
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1rem);
+  }
+
+  /* Touch scrollers should not paint desktop scrollbars. */
+  ::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+}
+
+/* Safe areas: the notch/dynamic island up top, the home indicator at the
+   bottom. Used by the sticky app bar and the bottom tab bar. */
+.pt-safe {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* For bars that sit on the screen edge: guarantees a thumb-sized gap even on
+   devices/browsers that report a zero inset. */
+.pb-safe-min {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+}
+
+.h-safe-top {
+  height: env(safe-area-inset-top, 0px);
+}
+
+/* Scroll region under a fixed app bar + bottom tab bar. */
+.pb-tabbar {
+  padding-bottom: calc(4.25rem + env(safe-area-inset-bottom, 0px));
+}
+
+/* Press feedback. Touch has no hover, so without this every control feels
+   dead on tap -- this is the single cheapest "feels native" win. Touch only:
+   on desktop the existing hover states already do this job, and a button
+   that shrinks under the mouse is a change nobody asked for. */
+@media (hover: none) and (pointer: coarse) {
+  .tap {
+    transition: transform 140ms cubic-bezier(0.2, 0.8, 0.3, 1), opacity 140ms ease;
+  }
+
+  .tap:active {
+    transform: scale(0.97);
+    opacity: 0.9;
+  }
+
+  .tap-row:active {
+    background-color: rgba(0, 0, 0, 0.045);
+  }
+}
+
+/* Bottom sheet: on phones a centred dialog reads as desktop chrome, so
+   modals enter from the bottom edge instead, with the grabber and rounded
+   top corners people expect to be able to drag. */
+@keyframes sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes sheet-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.animate-sheet-in {
+  animation: sheet-in 300ms cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+.animate-sheet-scrim-in {
+  animation: sheet-scrim-in 220ms ease-out;
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-dialog-in {
+  animation: dialog-in 200ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+/* Route transition: without it, tapping a tab swaps the screen with a hard
+   cut that no native app has. Phones only -- the desktop portal never had a
+   page transition and does not need one. */
+@keyframes screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 1023px) {
+  .animate-screen-in {
+    animation: screen-in 260ms cubic-bezier(0.2, 0.8, 0.3, 1);
+  }
+}
+
+/* Horizontal card rails should snap like a native carousel rather than
+   sliding to arbitrary offsets. */
+.snap-rail {
+  scroll-snap-type: x mandatory;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.snap-rail > * {
+  scroll-snap-align: start;
+}
+
+.snap-rail::-webkit-scrollbar {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-sheet-in,
+  .animate-sheet-scrim-in,
+  .animate-dialog-in,
+  .animate-screen-in,
+  .tap {
+    animation: none;
+    transition: none;
+  }
+}
+
 /* Batch-generation page card: the page currently being rendered (as opposed
    to ones still waiting their turn, or already done) shows this sliding bar
    -- there's no real byte-level progress inside a single page's render, so
@@ -233,4 +431,702 @@ body {
 
 .animate-landing-marquee {
   animation: landing-marquee 26s linear infinite;
+}
+
+/* "खुद वही पेज, परत-दर-परत बनते हुए" -- the five build-stage sheets
+   (see PageSheet/BuildProcess3D) sit at real depth via translateZ on a
+   shared preserve-3d group. This is the CAMERA's motion, independent of
+   the JS reveal clock that actually snaps each layer into place: it swings
+   both rotateX and rotateY, holding at each extreme like a robotic arm
+   that reaches a position and locks rather than drifting through it, so
+   the scene keeps turning in more than one axis while the construction
+   sequence plays. Paused on hover so a visitor can read a settled frame. */
+@keyframes landing-inspect {
+  0%,
+  12% {
+    transform: rotateX(20deg) rotateY(-26deg);
+  }
+  38%,
+  62% {
+    transform: rotateX(8deg) rotateY(26deg);
+  }
+  88%,
+  100% {
+    transform: rotateX(20deg) rotateY(-26deg);
+  }
+}
+
+.animate-landing-inspect {
+  animation: landing-inspect 11s cubic-bezier(0.76, 0, 0.24, 1) infinite;
+}
+
+.animate-landing-inspect:hover {
+  animation-play-state: paused;
+}
+
+/* One-shot glow pulse the instant the reveal clock (see BuildProcess3D's
+   revealCount state) reaches the finished page, so the payoff of a full
+   construction cycle actually reads as a payoff instead of just quietly
+   fading in like every earlier layer did. */
+@keyframes landing-final-pulse {
+  0% {
+    filter: drop-shadow(0 0 0 rgba(52, 211, 153, 0));
+  }
+  30% {
+    filter: drop-shadow(0 0 28px rgba(52, 211, 153, 0.85));
+  }
+  100% {
+    filter: drop-shadow(0 0 0 rgba(52, 211, 153, 0));
+  }
+}
+
+.animate-landing-final-pulse {
+  animation: landing-final-pulse 1.1s ease-out 1;
+}
+
+/* Atmosphere motes drifting up through the dark stage (see PARTICLES in
+   BuildProcess3D) -- rise-and-fade so the space around the exploded page
+   reads as a live volume rather than empty dead air. */
+@keyframes landing-particle-rise {
+  0% {
+    transform: translateY(0) scale(0.6);
+    opacity: 0;
+  }
+  15% {
+    opacity: 1;
+  }
+  85% {
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-360px) scale(1.1);
+    opacity: 0;
+  }
+}
+
+.animate-landing-particle-rise {
+  animation: landing-particle-rise linear infinite;
+}
+
+/* ==========================================================================
+   PORTAL DESIGN LAYER
+   Visual only -- no layout, breakpoint or behaviour changes.
+
+   Performance rules this section holds to, because this app is also a
+   WebView shell on mid-range Android phones:
+     - Only transform and opacity are ever animated (compositor-only; no
+       layout or paint work per frame).
+     - backdrop-filter appears ONLY on the two fixed bars. It is the single
+       most expensive property here, and cost scales with painted area, so
+       it is never put on cards or list rows.
+     - Entrance animations run once and are short (<= 320ms). Nothing loops.
+     - No JS, no new dependencies: this is all static CSS, so it costs
+       nothing at runtime beyond style resolution.
+   ========================================================================== */
+
+:root {
+  --brand-from: #059669;
+  --brand-to: #0d9488;
+  --ink: #0b1120;
+  --hairline: rgba(16, 24, 40, 0.07);
+  /* Two-layer shadow: a tight contact line plus a wide soft ambient, which
+     reads as real depth where a single large blur reads as a smudge. */
+  --shadow-card: 0 1px 2px rgba(16, 24, 40, 0.04), 0 10px 24px -14px rgba(16, 24, 40, 0.14);
+  --shadow-lift: 0 2px 4px rgba(16, 24, 40, 0.05), 0 18px 36px -18px rgba(16, 24, 40, 0.22);
+  --shadow-brand: 0 6px 18px -6px rgba(5, 150, 105, 0.45);
+}
+
+body {
+  /* Fixed attachment so the wash never repaints while scrolling. */
+  background-image:
+    radial-gradient(1100px 500px at 88% -8%, rgba(13, 148, 136, 0.06), transparent 60%),
+    radial-gradient(900px 460px at -6% 4%, rgba(5, 150, 105, 0.05), transparent 60%);
+  background-attachment: fixed;
+}
+
+/* ── Surfaces ─────────────────────────────────────────────────────────── */
+
+.surface-card {
+  border: 1px solid var(--hairline);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--shadow-card);
+  transition: box-shadow 220ms ease, transform 220ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+/* Lift on hover only where there is a real cursor -- on touch this would
+   fire on every scroll-tap and just look twitchy. */
+@media (hover: hover) and (pointer: fine) {
+  .surface-card.is-interactive:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-lift);
+  }
+}
+
+/* The glass. Restricted to the app bar and tab bar: both are small, fixed,
+   and already composited, which is the only place blur is affordable. */
+.glass-bar {
+  background: rgba(255, 255, 255, 0.72);
+  -webkit-backdrop-filter: blur(18px) saturate(180%);
+  backdrop-filter: blur(18px) saturate(180%);
+  border-color: rgba(16, 24, 40, 0.08);
+}
+
+@supports not (backdrop-filter: blur(1px)) {
+  .glass-bar {
+    background: rgba(255, 255, 255, 0.96);
+  }
+}
+
+/* Hero panel for the one number that matters on a screen (wallet balance). */
+.hero-panel {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #04212b 0%, #06333c 55%, #064e3b 100%);
+  color: #ecfdf5;
+  box-shadow: var(--shadow-lift);
+}
+
+.hero-panel::after {
+  /* Static sheen -- a gradient, not an animation, so it costs one paint. */
+  content: "";
+  position: absolute;
+  inset: -40% -10% auto auto;
+  width: 62%;
+  height: 190%;
+  background: radial-gradient(closest-side, rgba(45, 212, 191, 0.28), transparent);
+  pointer-events: none;
+}
+
+.hero-panel > * {
+  position: relative;
+}
+
+/* ── Type ─────────────────────────────────────────────────────────────── */
+
+.page-title {
+  letter-spacing: -0.022em;
+  color: var(--ink);
+}
+
+/* Numerals that do not jitter as balances change. */
+.numeric {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.015em;
+}
+
+.brand-text {
+  background: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── Controls ─────────────────────────────────────────────────────────── */
+
+.btn-brand {
+  position: relative;
+  overflow: hidden;
+  border: 0;
+  background: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+  color: #fff;
+  box-shadow: var(--shadow-brand);
+  transition: box-shadow 200ms ease, transform 200ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    filter 200ms ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-brand:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 24px -6px rgba(5, 150, 105, 0.55);
+    filter: saturate(1.06);
+  }
+}
+
+.btn-brand:disabled {
+  box-shadow: none;
+  filter: grayscale(0.25);
+}
+
+/* Neutral counterpart, for secondary actions that were plain black. */
+.btn-ink {
+  background: linear-gradient(135deg, #111827, #0b1120);
+  color: #fff;
+  border: 0;
+  box-shadow: 0 6px 16px -8px rgba(11, 17, 32, 0.6);
+  transition: box-shadow 200ms ease, transform 200ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .btn-ink:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 10px 22px -8px rgba(11, 17, 32, 0.7);
+  }
+}
+
+/* Selected state for choice chips / amount presets. */
+.chip-active {
+  background: linear-gradient(135deg, var(--brand-from), var(--brand-to));
+  border-color: transparent;
+  color: #fff;
+  box-shadow: var(--shadow-brand);
+}
+
+/* ── Entrance ─────────────────────────────────────────────────────────── */
+
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 10px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.rise-in {
+  animation: rise-in 300ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+/* Stagger without inline styles or JS. Capped at six: past that the last
+   card waits long enough that the screen feels slow rather than considered. */
+.stagger > *:nth-child(1) { animation-delay: 0ms; }
+.stagger > *:nth-child(2) { animation-delay: 45ms; }
+.stagger > *:nth-child(3) { animation-delay: 90ms; }
+.stagger > *:nth-child(4) { animation-delay: 135ms; }
+.stagger > *:nth-child(5) { animation-delay: 180ms; }
+.stagger > *:nth-child(n + 6) { animation-delay: 215ms; }
+
+@media (prefers-reduced-motion: reduce) {
+  .rise-in,
+  .stagger > * {
+    animation: none;
+  }
+
+  .surface-card,
+  .btn-brand,
+  .btn-ink {
+    transition: none;
+  }
+}
+
+/* ── Shell chrome ─────────────────────────────────────────────────────── */
+
+.sidebar-shell {
+  background:
+    radial-gradient(720px 320px at 0% 0%, rgba(13, 148, 136, 0.16), transparent 62%),
+    linear-gradient(180deg, #0b1120 0%, #070d18 100%);
+  border-right: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.nav-item {
+  position: relative;
+  transition: color 180ms ease, background-color 180ms ease;
+}
+
+.nav-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+}
+
+.nav-item.is-active {
+  background: linear-gradient(135deg, rgba(5, 150, 105, 0.22), rgba(13, 148, 136, 0.14));
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgba(45, 212, 191, 0.28);
+}
+
+/* The rail that marks the current section. */
+.nav-item.is-active::before {
+  content: "";
+  position: absolute;
+  left: -12px;
+  top: 50%;
+  height: 20px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: linear-gradient(180deg, #34d399, #14b8a6);
+  transform: translateY(-50%);
+}
+
+/* ── Bottom tab bar ───────────────────────────────────────────────────── */
+
+.tab-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  padding: 7px 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #6b7280;
+  transition: color 200ms ease;
+}
+
+.tab-item.is-active {
+  color: #047857;
+}
+
+/* The pill behind the active icon. Scale/opacity only -- no layout work, so
+   switching tabs costs nothing on a mid-range phone. */
+.tab-icon {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 26px;
+}
+
+.tab-icon::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(5, 150, 105, 0.14), rgba(13, 148, 136, 0.12));
+  opacity: 0;
+  transform: scale(0.7);
+  transition: opacity 220ms ease, transform 260ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.tab-item.is-active .tab-icon::before {
+  opacity: 1;
+  transform: scale(1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-icon::before,
+  .nav-item,
+  .tab-item {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   GUIDED TOUR
+   Only in the DOM while the tour is running, so none of this costs anything
+   during normal use. Looping animation is limited to the target pulse, and it
+   animates transform/opacity only (compositor, no layout or paint per frame).
+   The dim layer punches its spotlight with a single large box-shadow, which
+   repaints once per step rather than every frame.
+   ========================================================================== */
+
+.tour-root {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+}
+
+.tour-spotlight {
+  position: fixed;
+  border-radius: 16px;
+  /* The hole: everything outside this box is dimmed by the shadow spread. */
+  box-shadow: 0 0 0 9999px rgba(6, 12, 26, 0.72);
+  transition: top 320ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    left 320ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    width 320ms cubic-bezier(0.2, 0.8, 0.3, 1),
+    height 320ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+/* Blinking ring around the highlighted control. */
+.tour-pulse {
+  position: fixed;
+  pointer-events: none;
+  border-radius: 16px;
+  box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.9);
+  animation: tour-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes tour-pulse {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.015);
+  }
+}
+
+/* ── Chalk arrow ──────────────────────────────────────────────────────── */
+
+.tour-arrow {
+  position: fixed;
+  pointer-events: none;
+  overflow: visible;
+}
+
+.tour-arrow-line,
+.tour-arrow-under,
+.tour-arrow-head {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+
+/* The "under" stroke is thicker, softer and slightly transparent; drawn
+   beneath the crisp line it reads as chalk grain -- an feTurbulence filter
+   would look better still and cost a full-surface repaint, which this does
+   not. */
+.tour-arrow-under {
+  stroke: rgba(255, 255, 255, 0.28);
+  stroke-width: 7;
+}
+
+.tour-arrow-line {
+  stroke: #ffffff;
+  stroke-width: 2.5;
+  stroke-dasharray: 4 7;
+}
+
+.tour-arrow-head {
+  stroke: #ffffff;
+  stroke-width: 3;
+}
+
+/* One-shot draw-in. stroke-dashoffset is a paint property, but this is a
+   120px-wide SVG animating once per step, not a loop. */
+.tour-arrow-line,
+.tour-arrow-head {
+  animation: tour-draw 520ms ease-out both;
+}
+
+@keyframes tour-draw {
+  from {
+    opacity: 0;
+    stroke-dashoffset: 260;
+  }
+  to {
+    opacity: 1;
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ── Step card ────────────────────────────────────────────────────────── */
+
+.tour-card {
+  position: fixed;
+  width: 320px;
+  max-width: calc(100vw - 24px);
+  padding: 16px 18px 14px;
+  border-radius: 18px;
+  background: #ffffff;
+  box-shadow: 0 18px 48px -12px rgba(6, 12, 26, 0.55);
+  animation: tour-card-in 300ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+@keyframes tour-card-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 8px, 0);
+  }
+}
+
+.tour-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tour-step-count {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: #0d9488;
+}
+
+.tour-skip {
+  border: 0;
+  background: none;
+  padding: 4px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b7280;
+  cursor: pointer;
+}
+
+.tour-title {
+  margin: 8px 0 0;
+  font-size: 16px;
+  font-weight: 800;
+  color: #0b1120;
+}
+
+.tour-body {
+  margin: 6px 0 0;
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #4b5563;
+}
+
+.tour-dots {
+  display: flex;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.tour-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #d1d5db;
+  transition: width 240ms ease, background-color 240ms ease;
+}
+
+.tour-dots span.is-on {
+  width: 18px;
+  background: linear-gradient(135deg, #059669, #0d9488);
+}
+
+.tour-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.tour-btn-ghost,
+.tour-btn-primary {
+  min-height: 40px;
+  padding: 0 16px;
+  border-radius: 11px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tour-btn-ghost {
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  color: #374151;
+}
+
+.tour-btn-primary {
+  border: 0;
+  background: linear-gradient(135deg, #059669, #0d9488);
+  color: #fff;
+  box-shadow: 0 6px 18px -6px rgba(5, 150, 105, 0.55);
+}
+
+/* Phones: the card spans the width at the bottom edge rather than floating
+   beside a control there is no room next to. */
+@media (max-width: 640px) {
+  .tour-card {
+    left: 12px !important;
+    right: 12px;
+    width: auto;
+    max-width: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tour-pulse,
+  .tour-arrow-line,
+  .tour-arrow-head,
+  .tour-card {
+    animation: none;
+  }
+  .tour-spotlight,
+  .tour-dots span {
+    transition: none;
+  }
+}
+
+/* ── Toggle switch ────────────────────────────────────────────────────── */
+
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 52px;
+  height: 31px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: #d7dbe0;
+  cursor: pointer;
+  transition: background-color 220ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.switch.is-on {
+  background: linear-gradient(135deg, #059669, #0d9488);
+}
+
+.switch-knob {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 25px;
+  height: 25px;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(16, 24, 40, 0.3);
+  /* transform, not `left`, so the knob slides on the compositor. */
+  transition: transform 240ms cubic-bezier(0.2, 0.8, 0.3, 1);
+}
+
+.switch.is-on .switch-knob {
+  transform: translateX(21px);
+}
+
+.switch:focus-visible {
+  outline: 2px solid #0d9488;
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switch,
+  .switch-knob {
+    transition: none;
+  }
+}
+
+/* Help button in the app bar. */
+.tour-toolbar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  padding: 4px;
+  box-shadow: 0 8px 22px -16px rgba(15, 23, 42, 0.45);
+}
+
+.help-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 999px;
+  border: 1px solid var(--hairline);
+  background: #fff;
+  color: #0d9488;
+  transition: color 180ms ease, border-color 180ms ease;
+}
+
+.help-btn:hover {
+  color: #047857;
+  border-color: rgba(13, 148, 136, 0.45);
+}
+
+.switch-compact {
+  width: 46px;
+  height: 28px;
+}
+
+.switch-compact .switch-knob {
+  width: 22px;
+  height: 22px;
+}
+
+.switch-compact.is-on .switch-knob {
+  transform: translateX(18px);
 }

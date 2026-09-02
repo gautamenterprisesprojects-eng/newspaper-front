@@ -22,12 +22,27 @@ const hind = Hind({
 export const metadata = {
   title: "PageMint",
   description: "पब्लिशर, वॉलेट और न्यूज़पेपर जनरेटर को मैनेज करने वाला पोर्टल.",
+  appleWebApp: { capable: true, statusBarStyle: "default" as const, title: "PageMint" },
+};
+
+// viewportFit "cover" lets the app paint under the notch/home indicator, which
+// is what makes env(safe-area-inset-*) return real values -- without it the
+// WebView letterboxes the page and the shell reads as a web page in a frame.
+// Zoom is pinned because a pinch-zoomable UI is the single most obvious tell
+// that a "native" app is actually a WebView.
+export const viewport = {
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: "cover" as const,
+  themeColor: "#047857",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="hi" className={`${inter.variable} ${hind.variable}`}>
-      <body className="min-h-screen bg-gray-50 text-gray-900 font-sans antialiased">
+      <body className="min-h-[100dvh] bg-gray-50 text-gray-900 font-sans antialiased app-shell">
         <SiteChrome>{children}</SiteChrome>
       </body>
     </html>
