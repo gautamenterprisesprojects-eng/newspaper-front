@@ -448,17 +448,24 @@ func SaaSGeneratorCheck(c *fiber.Ctx) error {
 	if !DeviceGateEnabled() {
 		return c.SendStatus(200)
 	}
-	original := c.Get("X-Original-URI")
-	idx := strings.Index(original, "?")
-	if idx < 0 {
-		return c.SendStatus(403)
-	}
-	values, err := url.ParseQuery(original[idx+1:])
-	if err != nil {
-		return c.SendStatus(403)
-	}
-	if verifyGeneratorToken(values.Get("lt")) {
+	// nginx hands over just the token. It used to pass the whole request
+	// line, but a real launch URL carries the page plan, the section config
+	// and the JWT -- several kilobytes -- and the subrequest came back 431
+	// (headers too large), which nginx reports as a 500 to the visitor
+	// rather than a clean yes or no.
+	if verifyGeneratorToken(c.Get("X-Launch-Token")) {
 		return c.SendStatus(200)
+	}
+	// Fallback for a proxy still sending the old header, so a config and
+	// binary that roll out in either order never both refuse.
+	if original := c.Get("X-Original-URI"); original != "" {
+		if idx := strings.Index(original, "?"); idx >= 0 {
+			if values, err := url.ParseQuery(original[idx+1:]); err == nil {
+				if verifyGeneratorToken(values.Get("lt")) {
+					return c.SendStatus(200)
+				}
+			}
+		}
 	}
 	return c.SendStatus(403)
 }
