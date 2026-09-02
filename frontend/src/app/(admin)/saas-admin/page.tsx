@@ -30,7 +30,7 @@ export default function AdminOverviewPage() {
 
   return (
     <div className="space-y-8">
-      <div><h1 className="text-2xl font-bold text-gray-900">ओवरव्यू</h1><p className="text-sm text-gray-500 mt-1">पूरे platform की स्थिति यहां देखें.</p></div>
+      <div><h1 className="page-title text-2xl font-bold">ओवरव्यू</h1><p className="text-sm text-gray-500 mt-1">पूरे platform की स्थिति यहां देखें.</p></div>
       {error && <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-medium">{error}</div>}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
         {cards.map((card) => {
@@ -38,10 +38,12 @@ export default function AdminOverviewPage() {
           return card.href ? <Link key={card.label} href={card.href}>{box}</Link> : <div key={card.label}>{box}</div>;
         })}
       </div>
-      <div className="p-6 rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="p-6 surface-card">
         <div className="text-xs font-semibold text-gray-500 uppercase tracking-wider">मौजूदा generation दर</div>
         <div className="text-2xl font-bold text-gray-900 mt-2">{rate !== null ? `₹${rate} / पेज` : "-"}</div>
-        <Link href="/saas-admin/pricing" className="inline-block mt-3 text-sm font-semibold text-black underline underline-offset-2">दर बदलें</Link>
+        {/* Original underlined text link on desktop; phones just get a
+            taller hit area on the same link. */}
+        <Link href="/saas-admin/pricing" className="mt-3 inline-flex min-h-[40px] items-center text-sm font-semibold text-black underline underline-offset-2 sm:mt-3 sm:inline-block sm:min-h-0">दर बदलें</Link>
       </div>
     </div>
   );

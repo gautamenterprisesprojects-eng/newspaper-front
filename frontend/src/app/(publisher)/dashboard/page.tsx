@@ -5,6 +5,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, CheckCircle2, Download, FileText, Newspaper, PenLine, X } from "lucide-react";
 import { API_BASE, apiFetch, GENERATOR_URL, getPublisherId, getToken } from "@/lib/api";
+import BottomSheet from "@/components/BottomSheet";
+import GuidedTour from "@/components/tour/GuidedTour";
+import { DASHBOARD_TOUR } from "@/components/tour/tourSteps";
 import { YouthUpdateMastheadTeasersPanel } from "./YouthUpdateMastheadTeasersPanel";
 import { YouthUpdateInsideAuthorPanel } from "./YouthUpdateInsideAuthorPanel";
 
@@ -602,26 +605,28 @@ export default function PublisherDashboard() {
 
   return (
     <div className="space-y-6">
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+      <div className="hero-panel rise-in flex flex-col justify-between gap-5 p-6 lg:flex-row lg:items-center">
         <div>
-          <h1 className="text-2xl font-bold text-gray-950">डैशबोर्ड</h1>
-          <p className="text-sm text-gray-600 mt-1">यहां से wallet check करके generator खोला जाएगा.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-white">डैशबोर्ड</h1>
+          <p className="mt-1 text-sm text-emerald-100/70">यहां से wallet check करके generator खोला जाएगा.</p>
         </div>
-        <div className="grid grid-cols-2 gap-4 text-right">
+        <div className="grid grid-cols-2 gap-6 lg:text-right">
           <div>
-            <div className="text-xs text-gray-500">बैलेंस</div>
-            <div className="text-xl font-bold text-gray-950">{balance !== null ? `₹${balance.toFixed(2)}` : "..."}</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-200/60">बैलेंस</div>
+            <div className="numeric mt-0.5 text-2xl font-bold text-white">
+              {balance !== null ? `₹${balance.toFixed(2)}` : "…"}
+            </div>
           </div>
           <div>
-            <div className="text-xs text-gray-500">दर</div>
-            <div className="text-xl font-bold text-gray-950">₹{ratePerPage}/पेज</div>
+            <div className="text-[11px] font-semibold uppercase tracking-wider text-emerald-200/60">दर</div>
+            <div className="numeric mt-0.5 text-2xl font-bold text-white">₹{ratePerPage}/पेज</div>
           </div>
         </div>
       </div>
 
       {errorMsg && <div className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-medium">{errorMsg}</div>}
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 grid sm:grid-cols-2 gap-4">
+      <div data-tour="issue-fields" className="surface-card p-6 grid sm:grid-cols-2 gap-4">
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1.5">अंक नंबर</label>
           <input value={issueNumber} onChange={(e) => setIssueNumber(e.target.value)} placeholder="जैसे Ank 126" className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black" />
@@ -650,62 +655,38 @@ export default function PublisherDashboard() {
       </div>
 
       {isYouthUpdatePublisher && pageSetupFor !== null ? (
-        <div
-          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 sm:p-8"
-          role="dialog"
-          aria-modal="true"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) closePageSetup();
-          }}
-        >
-          <div className="relative w-full max-w-5xl rounded-2xl bg-white p-4 shadow-xl sm:p-6">
-            <div className="mb-4 flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-bold text-gray-950">
-                  {pageSetupFor === 1
-                    ? "पेज 1 — मास्टहेड टीज़र"
-                    : `पेज ${pageSetupFor} — इनसाइड ऑथर बैज`}
-                </h2>
-                <p className="mt-1 text-sm text-gray-600">
-                  भरना ज़रूरी नहीं है. खाली छोड़ेंगे तो पेज अपने आप लाइव न्यूज़ से बन जाएगा.
-                </p>
-              </div>
+        <BottomSheet
+          open
+          onClose={closePageSetup}
+          title={pageSetupFor === 1 ? "पेज 1 — मास्टहेड टीज़र" : `पेज ${pageSetupFor} — इनसाइड ऑथर बैज`}
+          subtitle="भरना ज़रूरी नहीं है. खाली छोड़ेंगे तो पेज अपने आप लाइव न्यूज़ से बन जाएगा."
+          footer={
+            <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
               <button
                 type="button"
                 onClick={() => closePageSetup()}
-                aria-label="बंद करें"
-                className="rounded-lg p-2 text-gray-500 transition hover:bg-gray-100 hover:text-gray-900"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {/* Page 1 is the front page and carries the masthead teasers; every
-                other page is an inside page and carries the author badges. */}
-            {pageSetupFor === 1 ? (
-              <YouthUpdateMastheadTeasersPanel />
-            ) : (
-              <YouthUpdateInsideAuthorPanel pageNumber={pageSetupFor} onSaved={closePageSetup} />
-            )}
-
-            <div className="mt-5 flex justify-end gap-3 border-t border-gray-200 pt-4">
-              <button
-                type="button"
-                onClick={() => closePageSetup()}
-                className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-50"
+                className="tap rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold text-gray-700"
               >
                 बिना भरे आगे बढ़ें
               </button>
               <button
                 type="button"
                 onClick={() => closePageSetup()}
-                className={`rounded-lg bg-black px-5 py-2 text-sm font-semibold text-white transition hover:bg-gray-800 ${pageSetupFor === 1 ? "" : "hidden"}`}
+                className={`tap btn-ink rounded-xl px-6 py-3 text-sm font-semibold ${pageSetupFor === 1 ? "" : "hidden"}`}
               >
                 हो गया
               </button>
             </div>
-          </div>
-        </div>
+          }
+        >
+          {/* Page 1 is the front page and carries the masthead teasers; every
+              other page is an inside page and carries the author badges. */}
+          {pageSetupFor === 1 ? (
+            <YouthUpdateMastheadTeasersPanel />
+          ) : (
+            <YouthUpdateInsideAuthorPanel pageNumber={pageSetupFor} onSaved={closePageSetup} />
+          )}
+        </BottomSheet>
       ) : null}
 
       {!batchActive && (
@@ -715,7 +696,7 @@ export default function PublisherDashboard() {
               slow-drifting soft gradient wash (.animate-card-gradient), a
               colour transition living inside the box rather than around
               it. */}
-          <div className="group relative overflow-hidden rounded-[28px] border border-emerald-100 p-7 shadow-[0_1px_3px_rgba(5,150,105,0.06)] transition-all duration-300 ease-out hover:shadow-[0_20px_45px_-10px_rgba(5,150,105,0.25)] hover:border-emerald-300">
+          <div data-tour="single-page" className="group relative overflow-hidden rounded-[28px] border border-emerald-100 p-7 shadow-[0_1px_3px_rgba(5,150,105,0.06)] transition-all duration-300 ease-out hover:shadow-[0_20px_45px_-10px_rgba(5,150,105,0.25)] hover:border-emerald-300">
             <div className="animate-card-gradient pointer-events-none absolute inset-0" />
 
             <div className="relative flex flex-col gap-8 lg:flex-row lg:items-center">
@@ -755,7 +736,7 @@ export default function PublisherDashboard() {
               in globals.css). Page count, cost text, and the fan
               illustration all come straight from the publisher's own
               profile (defaultPages), never hardcoded. */}
-          <div className="relative isolate overflow-hidden rounded-[28px] p-[2px]">
+          <div data-tour="full-issue" className="relative isolate overflow-hidden rounded-[28px] p-[2px]">
             <div className="animate-border-beam pointer-events-none absolute left-1/2 top-1/2 h-[260%] w-[260%] -translate-x-1/2 -translate-y-1/2 bg-[conic-gradient(from_0deg,transparent_0deg,transparent_255deg,#059669_275deg,#10b981_297deg,#34d399_315deg,#0d9488_333deg,transparent_352deg,transparent_360deg)]" />
             <div
               role="button"
@@ -831,7 +812,7 @@ export default function PublisherDashboard() {
       )}
 
       {batchActive && (
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm p-6 space-y-4">
+        <div className="surface-card p-6 space-y-4">
           {batchSrc && (
             <iframe
               ref={batchIframeRef}
@@ -924,127 +905,116 @@ export default function PublisherDashboard() {
         </div>
       )}
 
-      <div className="grid sm:grid-cols-3 gap-4">
+      {/* Phones reach all three from the bottom tab bar, so repeating them
+          here is just filler between the content and the tab bar. */}
+      <div className="hidden gap-4 lg:grid lg:grid-cols-3">
         <Link href="/wallet" className="bg-white border border-gray-200 rounded-xl p-4 text-sm font-semibold hover:border-gray-400">वॉलेट और रिचार्ज</Link>
         <Link href="/history" className="bg-white border border-gray-200 rounded-xl p-4 text-sm font-semibold hover:border-gray-400">पुराने अंक</Link>
         <Link href="/profile" className="bg-white border border-gray-200 rounded-xl p-4 text-sm font-semibold hover:border-gray-400">प्रोफाइल सेटिंग</Link>
       </div>
 
-      {showPagePicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
-          <div className="w-full max-w-xl rounded-xl border border-gray-200 bg-white p-5 shadow-xl">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <h2 className="text-lg font-bold text-gray-950">कौन सा पेज बनाना है?</h2>
-                <p className="mt-1 text-sm text-gray-600">Profile में {defaultPages} pages हैं. एक पेज बनाने पर wallet से ₹{ratePerPage.toFixed(2)} कटेंगे.</p>
-              </div>
-              <button type="button" onClick={() => setShowPagePicker(false)} className="rounded-lg border border-gray-300 px-3 py-1 text-sm font-semibold">बंद</button>
-            </div>
-
-            <div className="mt-5">
-              <div className="mb-2 text-xs font-semibold text-gray-600">Page number</div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {pageNumbers.map((pageNumber) => {
-                  const section = pageSections.find((page) => page.page_number === pageNumber);
-                  const kind = pageNumber === 1 ? "front" : section?.header_type || "inside";
-                  return (
-                    <button
-                      key={pageNumber}
-                      type="button"
-                      onClick={() => choosePageNumber(pageNumber)}
-                      className={`rounded-lg border px-3 py-3 text-left text-sm font-semibold ${selectedPageNumber === pageNumber ? "border-black bg-black text-white" : "border-gray-200 bg-white text-gray-900 hover:border-gray-400"}`}
-                    >
-                      <span className="block">Page {pageNumber}</span>
-                      <span className={`mt-1 block text-xs ${selectedPageNumber === pageNumber ? "text-gray-200" : "text-gray-500"}`}>{section?.section || getPageKindLabel(kind)}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="mt-5">
-              <div className="mb-2 text-xs font-semibold text-gray-600">Selected page</div>
-              <div className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-800">
-                Page {selectedPageNumber} · {selectedSection?.section || "Normal page"} · {getPageKindLabel(selectedPageNumber === 1 ? "front" : selectedSection?.header_type || "inside")}
-              </div>
-            </div>
-
-            <div className="mt-5 flex justify-end gap-3">
-              <button type="button" onClick={() => setShowPagePicker(false)} className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-semibold">Cancel</button>
-              <button type="button" onClick={() => handleGenerate("single", 1, selectedPageNumber)} disabled={checking !== null} className="rounded-lg bg-black px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">
-                {checking === "single" ? "Generator खोल रहे हैं..." : `Page ${selectedPageNumber} बनाएं`}
+      <BottomSheet
+        open={showPagePicker}
+        onClose={() => setShowPagePicker(false)}
+        title="कौन सा पेज बनाना है?"
+        subtitle={`Profile में ${defaultPages} pages हैं. एक पेज बनाने पर wallet से ₹${ratePerPage.toFixed(2)} कटेंगे.`}
+        footer={
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setShowPagePicker(false)}
+              className="tap hidden flex-1 rounded-xl border border-gray-300 px-4 py-3 text-sm font-semibold sm:block"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => handleGenerate("single", 1, selectedPageNumber)}
+              disabled={checking !== null}
+              className="tap w-full flex-1 rounded-xl bg-black px-4 py-3.5 text-base font-semibold text-white disabled:opacity-60 sm:py-3 sm:text-sm"
+            >
+              {checking === "single" ? "Generator खोल रहे हैं..." : `Page ${selectedPageNumber} बनाएं`}
+            </button>
+          </div>
+        }
+      >
+        <div className="mb-2 text-xs font-semibold text-gray-600">Page number</div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {pageNumbers.map((pageNumber) => {
+            const section = pageSections.find((page) => page.page_number === pageNumber);
+            const kind = pageNumber === 1 ? "front" : section?.header_type || "inside";
+            return (
+              <button
+                key={pageNumber}
+                type="button"
+                onClick={() => choosePageNumber(pageNumber)}
+                className={`tap min-h-[60px] rounded-xl border px-3 py-3 text-left text-sm font-semibold ${
+                  selectedPageNumber === pageNumber
+                    ? "border-black bg-black text-white"
+                    : "border-gray-200 bg-white text-gray-900"
+                }`}
+              >
+                <span className="block">Page {pageNumber}</span>
+                <span className={`mt-1 block text-xs ${selectedPageNumber === pageNumber ? "text-gray-200" : "text-gray-500"}`}>
+                  {section?.section || getPageKindLabel(kind)}
+                </span>
               </button>
-            </div>
+            );
+          })}
+        </div>
+
+        <div className="mt-5">
+          <div className="mb-2 text-xs font-semibold text-gray-600">Selected page</div>
+          <div className="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm font-semibold text-gray-800">
+            Page {selectedPageNumber} · {selectedSection?.section || "Normal page"} · {getPageKindLabel(selectedPageNumber === 1 ? "front" : selectedSection?.header_type || "inside")}
           </div>
         </div>
-      )}
+      </BottomSheet>
 
       {/* Manual news seeder — step 1: pick which page (same page-grid pattern
           as the single-page picker above, different purpose: this one opens
           the per-box seeder for that page rather than generating it alone). */}
-      {showManualPagePicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/60 backdrop-blur-sm px-4">
-          <div className="relative w-full max-w-xl overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-2xl">
-            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-500 via-violet-500 to-indigo-500" />
-            <div className="p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-md shadow-indigo-500/25">
-                    <PenLine className="h-5 w-5" strokeWidth={2} />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-bold text-gray-950">किस पेज के लिए मैनुअल न्यूज़ भरनी है?</h2>
-                    <p className="mt-1 text-sm text-gray-500">जो पेज नहीं चुनेंगे, वहाँ खबरें अपने आप API से भर जाएंगी।</p>
-                  </div>
+      <BottomSheet
+        open={showManualPagePicker}
+        onClose={() => setShowManualPagePicker(false)}
+        title="किस पेज के लिए मैनुअल न्यूज़ भरनी है?"
+        subtitle="जो पेज नहीं चुनेंगे, वहाँ खबरें अपने आप API से भर जाएंगी।"
+      >
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {pageNumbers.map((pageNumber) => {
+            const section = pageSections.find((page) => page.page_number === pageNumber);
+            const kind = pageNumber === 1 ? "front" : section?.header_type || "inside";
+            const isEditorial = isEditorialSection(section?.section);
+            const boxCount = (manualPageEntries[pageNumber] || []).filter((e) => e.headline.trim() && e.body.trim()).length;
+            const accent = pageNumber === 1
+              ? { Icon: Newspaper, badge: "text-indigo-600 bg-indigo-50" }
+              : isEditorial
+                ? { Icon: PenLine, badge: "text-amber-600 bg-amber-50" }
+                : { Icon: FileText, badge: "text-gray-600 bg-gray-100" };
+            const { Icon } = accent;
+            return (
+              <button
+                key={pageNumber}
+                type="button"
+                onClick={() => openManualSeederForPage(pageNumber)}
+                className="tap relative min-h-[92px] rounded-xl border border-gray-200 bg-white px-3 py-3 text-left"
+              >
+                <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${accent.badge}`}>
+                  <Icon className="h-4 w-4" strokeWidth={2} />
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setShowManualPagePicker(false)}
-                  aria-label="बंद करें"
-                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray-200 text-gray-500 transition-colors hover:border-gray-300 hover:bg-gray-50 hover:text-gray-900"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-
-              <div className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {pageNumbers.map((pageNumber) => {
-                  const section = pageSections.find((page) => page.page_number === pageNumber);
-                  const kind = pageNumber === 1 ? "front" : section?.header_type || "inside";
-                  const isEditorial = isEditorialSection(section?.section);
-                  const boxCount = (manualPageEntries[pageNumber] || []).filter((e) => e.headline.trim() && e.body.trim()).length;
-                  const accent = pageNumber === 1
-                    ? { Icon: Newspaper, hover: "hover:border-indigo-300 hover:bg-indigo-50/50", badge: "text-indigo-600 bg-indigo-50" }
-                    : isEditorial
-                      ? { Icon: PenLine, hover: "hover:border-amber-300 hover:bg-amber-50/50", badge: "text-amber-600 bg-amber-50" }
-                      : { Icon: FileText, hover: "hover:border-gray-300 hover:bg-gray-50", badge: "text-gray-600 bg-gray-100" };
-                  const { Icon } = accent;
-                  return (
-                    <button
-                      key={pageNumber}
-                      type="button"
-                      onClick={() => openManualSeederForPage(pageNumber)}
-                      className={`group relative rounded-xl border border-gray-200 bg-white px-3 py-3 text-left transition-all duration-200 ${accent.hover} hover:-translate-y-0.5 hover:shadow-md`}
-                    >
-                      <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${accent.badge}`}>
-                        <Icon className="h-4 w-4" strokeWidth={2} />
-                      </div>
-                      <span className="mt-2 block text-sm font-bold text-gray-900">Page {pageNumber}</span>
-                      <span className="mt-0.5 block text-xs text-gray-500">
-                        {section?.section || getPageKindLabel(kind)}
-                        {isEditorial && " · संपादकीय"}
-                      </span>
-                      {boxCount > 0 && (
-                        <span className="absolute top-2 right-2 inline-flex items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-bold w-5 h-5 ring-2 ring-white">{boxCount}</span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+                <span className="mt-2 block text-sm font-bold text-gray-900">Page {pageNumber}</span>
+                <span className="mt-0.5 block text-xs text-gray-500">
+                  {section?.section || getPageKindLabel(kind)}
+                  {isEditorial && " · संपादकीय"}
+                </span>
+                {boxCount > 0 && (
+                  <span className="absolute top-2 right-2 inline-flex h-5 w-5 items-center justify-center rounded-full bg-emerald-600 text-[10px] font-bold text-white ring-2 ring-white">{boxCount}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
-      )}
+      </BottomSheet>
 
       {/* Manual news seeder — step 2: per-box content for the chosen page.
           Editorial pages (page_sections.section === "Editorial") additionally
@@ -1058,18 +1028,36 @@ export default function PublisherDashboard() {
         const entries = manualPageEntries[pageNumber] || [];
 
         return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6">
-            <div className="w-full max-w-2xl max-h-full overflow-y-auto rounded-xl border border-gray-200 bg-white p-5 shadow-xl">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-bold text-gray-950">
-                    Page {pageNumber} · {section?.section || getPageKindLabel(pageNumber === 1 ? "front" : "inside")}
-                    {isEditorial && " (संपादकीय)"}
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-600">हेडलाइन और टेक्स्ट भरना ज़रूरी है — बाकी सब वैकल्पिक। खाली छोड़ने पर बॉक्स अपने आप भर जाएगा।</p>
-                </div>
-                <button type="button" onClick={() => setManualSeederPageNumber(null)} className="rounded-lg border border-gray-300 px-3 py-1 text-sm font-semibold shrink-0">बंद</button>
+          <BottomSheet
+            open
+            onClose={() => setManualSeederPageNumber(null)}
+            title={
+              <>
+                Page {pageNumber} · {section?.section || getPageKindLabel(pageNumber === 1 ? "front" : "inside")}
+                {isEditorial && " (संपादकीय)"}
+              </>
+            }
+            subtitle="हेडलाइन और टेक्स्ट भरना ज़रूरी है — बाकी सब वैकल्पिक। खाली छोड़ने पर बॉक्स अपने आप भर जाएगा।"
+            footer={
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => addManualBoxForPage(pageNumber)}
+                  className="tap rounded-xl border border-dashed border-gray-400 px-4 py-3 text-sm font-semibold text-gray-700"
+                >
+                  + और बॉक्स जोड़ें
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setManualSeederPageNumber(null)}
+                  className="tap btn-ink rounded-xl px-6 py-3 text-sm font-semibold"
+                >
+                  हो गया
+                </button>
               </div>
+            }
+          >
+            <div>
 
               {isEditorial && (
                 <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 p-4">
@@ -1167,18 +1155,14 @@ export default function PublisherDashboard() {
                 })}
               </div>
 
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <button type="button" onClick={() => addManualBoxForPage(pageNumber)} className="rounded-lg border border-dashed border-gray-400 px-4 py-2 text-sm font-semibold text-gray-700 hover:border-gray-600">
-                  + और बॉक्स जोड़ें
-                </button>
-                <button type="button" onClick={() => setManualSeederPageNumber(null)} className="rounded-lg bg-black px-5 py-2.5 text-sm font-semibold text-white">
-                  हो गया
-                </button>
-              </div>
             </div>
-          </div>
+          </BottomSheet>
         );
       })()}
+
+      {/* Runs once on a publisher's first visit, and on demand from the
+          Settings toggle or the help button. Renders nothing when idle. */}
+      <GuidedTour steps={DASHBOARD_TOUR} />
     </div>
   );
 }

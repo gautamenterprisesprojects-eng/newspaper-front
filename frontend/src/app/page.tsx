@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { apiFetch } from "@/lib/api";
 
@@ -185,6 +185,240 @@ function HeroMock() {
   );
 }
 
+// Each stage gets its own accent instead of one flat green -- a real
+// exploded-diagram/PCB-layer legend reads by colour first, and it's the
+// clearest possible fix for "the back layers all look like the same dark
+// nothing": now every sheet is a different, clearly named colour until the
+// final one resolves to the real page's own white/emerald.
+const BUILD_STAGES = [
+  { label: "टेम्पलेट ग्रिड", hasGrid: true, hasMasthead: false, hasContent: false, hasPhoto: false, isFinal: false, accent: "slate", glow: "rgba(148,163,184,0.5)" },
+  { label: "मास्टहेड जुड़ता है", hasGrid: true, hasMasthead: true, hasContent: false, hasPhoto: false, isFinal: false, accent: "sky", glow: "rgba(56,189,248,0.5)" },
+  { label: "कंटेंट फिट होता है", hasGrid: true, hasMasthead: true, hasContent: true, hasPhoto: false, isFinal: false, accent: "violet", glow: "rgba(167,139,250,0.5)" },
+  { label: "फ़ोटो जुड़ती है", hasGrid: true, hasMasthead: true, hasContent: true, hasPhoto: true, isFinal: false, accent: "amber", glow: "rgba(251,191,36,0.5)" },
+  { label: "फाइनल पेज तैयार", hasGrid: true, hasMasthead: true, hasContent: true, hasPhoto: true, isFinal: true, accent: "emerald", glow: "rgba(52,211,153,0.7)" },
+] as const;
+
+const ACCENT_CLASSES: Record<string, { border: string; bg: string; text: string; sub: string; dash: string }> = {
+  slate: { border: "border-slate-300/70", bg: "bg-slate-500/25", text: "text-slate-50", sub: "text-slate-300", dash: "border-slate-300/60" },
+  sky: { border: "border-sky-300/70", bg: "bg-sky-500/25", text: "text-sky-50", sub: "text-sky-300", dash: "border-sky-300/60" },
+  violet: { border: "border-violet-300/70", bg: "bg-violet-500/25", text: "text-violet-50", sub: "text-violet-300", dash: "border-violet-300/60" },
+  amber: { border: "border-amber-300/70", bg: "bg-amber-500/25", text: "text-amber-50", sub: "text-amber-300", dash: "border-amber-300/60" },
+  emerald: { border: "border-emerald-300/80", bg: "bg-emerald-500/25", text: "text-emerald-50", sub: "text-emerald-300", dash: "border-emerald-300/70" },
+};
+
+/**
+ * One physical sheet of the page at a given point in its own assembly --
+ * not a decorative icon card. Each stage is literally the SAME mini
+ * newspaper mock as the hero's, just with later elements not painted in
+ * yet (still marked out as dashed placeholders), so the "how it's built"
+ * story is the page itself accumulating detail, not five unrelated icons.
+ */
+function PageSheet({ stage }: { stage: (typeof BUILD_STAGES)[number] }) {
+  const c = ACCENT_CLASSES[stage.accent];
+  return (
+    <div
+      className={`relative w-[270px] h-[192px] rounded-lg p-4 backdrop-blur-sm ${
+        stage.isFinal ? "bg-white ring-2 ring-emerald-400/80" : `${c.bg} border ${c.border}`
+      }`}
+      style={!stage.isFinal ? { boxShadow: `0 0 32px -8px ${stage.glow}` } : undefined}
+    >
+      {stage.isFinal && (
+        <span className="absolute -top-3 right-3 flex items-center gap-1.5 rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 px-2 py-0.5 text-[8px] font-bold tracking-wide text-white shadow-md shadow-emerald-500/40">
+          <span className="h-1 w-1 rounded-full bg-white animate-landing-blink" /> LIVE
+        </span>
+      )}
+      <div
+        className={`flex items-baseline justify-between pb-1.5 mb-2 ${
+          stage.hasMasthead ? `border-b-2 border-double ${stage.isFinal ? "border-gray-900" : c.dash}` : `border-b border-dashed ${c.dash}`
+        }`}
+      >
+        {stage.hasMasthead ? (
+          <span className={`font-extrabold text-sm tracking-tight ${stage.isFinal ? "text-gray-950" : c.text}`}>दैनिक समाचार</span>
+        ) : (
+          <span className={`text-[8px] uppercase tracking-widest ${c.sub}`}>मास्टहेड</span>
+        )}
+        <span className={`text-[7px] leading-tight ${stage.isFinal ? "text-gray-500" : c.sub}`}>30 अगस्त · अंक 214</span>
+      </div>
+
+      {stage.hasContent ? (
+        <div className={`text-[10px] font-bold leading-snug mb-1.5 ${stage.isFinal ? "text-gray-950" : c.text}`}>
+          प्रदेश में नई योजना का शुभारंभ
+        </div>
+      ) : (
+        <div className="h-[10px] mb-1.5" />
+      )}
+
+      {stage.hasPhoto ? (
+        <div className={`relative h-9 rounded-sm overflow-hidden mb-1.5 ${stage.isFinal ? "bg-gradient-to-br from-gray-200 to-gray-300" : `${c.bg} border ${c.border}`}`}>
+          {stage.isFinal && (
+            <div className="absolute inset-0 bg-[linear-gradient(115deg,transparent_30%,rgba(255,255,255,0.6)_45%,transparent_60%)] bg-[length:220%_100%] animate-landing-shimmer" />
+          )}
+        </div>
+      ) : (
+        <div className={`h-9 rounded-sm border border-dashed ${c.dash} mb-1.5 flex items-center justify-center`}>
+          <span className={`text-[7px] ${c.sub}`}>फ़ोटो</span>
+        </div>
+      )}
+
+      <div className="grid grid-cols-3 gap-1.5">
+        {[0, 1, 2].map((col) => (
+          <div key={col} className="space-y-1">
+            {[0, 1, 2].map((row) => (
+              <div
+                key={row}
+                className={`h-[3px] rounded-full ${row === 2 ? "w-3/4" : "w-full"} ${
+                  stage.hasContent ? (stage.isFinal ? "bg-gray-200" : "bg-white/25") : `bg-transparent border-t border-dashed ${c.dash}`
+                }`}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+const STAGE_DEPTH = 90;
+const STAGE_RISE = 72;
+const STAGE_DRIFT = 26;
+
+/** Small drifting motes rising through the scene -- pure atmosphere, the
+    same trick sci-fi product-hero shots use so an otherwise static dark
+    stage reads as a live volume of space, not a flat backdrop. */
+const PARTICLES = [
+  { left: "12%", size: 3, delay: "0s", duration: "7s", color: "rgba(52,211,153,0.6)" },
+  { left: "22%", size: 2, delay: "1.4s", duration: "9s", color: "rgba(56,189,248,0.55)" },
+  { left: "38%", size: 2.5, delay: "2.6s", duration: "8s", color: "rgba(167,139,250,0.5)" },
+  { left: "58%", size: 2, delay: "0.8s", duration: "10s", color: "rgba(251,191,36,0.5)" },
+  { left: "72%", size: 3, delay: "3.5s", duration: "7.5s", color: "rgba(52,211,153,0.55)" },
+  { left: "85%", size: 2, delay: "2s", duration: "8.5s", color: "rgba(56,189,248,0.5)" },
+];
+
+const REVEAL_STEP_MS = 1250;
+const REVEAL_HOLD_MS = 1900;
+
+function BuildProcess3D() {
+  const count = BUILD_STAGES.length;
+  // The rotation (animate-landing-inspect, on the outer group) runs
+  // continuously and independently in CSS; this reveal count is the
+  // separate "robot assembling the page" clock -- each tick snaps one more
+  // layer into place, then holds on the finished page before resetting to
+  // 1 and building the whole thing again, on a loop.
+  const [revealCount, setRevealCount] = useState(1);
+
+  useEffect(() => {
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    const advance = (n: number) => {
+      if (cancelled) return;
+      setRevealCount(n);
+      timer = setTimeout(() => advance(n < count ? n + 1 : 1), n < count ? REVEAL_STEP_MS : REVEAL_HOLD_MS);
+    };
+    advance(1);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [count]);
+
+  return (
+    <section className="py-16">
+      <div className="max-w-xl mx-auto text-center mb-14">
+        <span className="block text-xs font-extrabold uppercase tracking-widest text-emerald-700 mb-3">कैसे बनता है</span>
+        <h2 className="font-extrabold text-3xl sm:text-4xl leading-tight text-gray-950 mb-4">
+          खुद वही पेज, परत-दर-परत बनते हुए
+        </h2>
+        <p className="text-base leading-7 text-gray-600">
+          यह कोई आइकॉन नहीं -- वही पेज है, जो ग्रिड से शुरू होकर प्रिंट-रेडी होने तक अपने आप जुड़ता जाता है।
+        </p>
+      </div>
+      <div className="relative mx-auto max-w-full overflow-hidden rounded-3xl bg-[#050c09]">
+        {/* Perspective floor grid receding into the dark -- the same trick
+            CAD/exploded-view product shots use so the scene reads as a real
+            lit space, not a flat coloured rectangle behind flat cards. */}
+        <div
+          className="absolute inset-x-0 bottom-0 h-1/2 opacity-70"
+          style={{
+            backgroundImage:
+              "linear-gradient(rgba(16,185,129,0.35) 1px, transparent 1px), linear-gradient(90deg, rgba(16,185,129,0.35) 1px, transparent 1px)",
+            backgroundSize: "44px 44px",
+            transform: "perspective(500px) rotateX(72deg)",
+            transformOrigin: "bottom",
+            maskImage: "linear-gradient(to top, black, transparent)",
+            WebkitMaskImage: "linear-gradient(to top, black, transparent)",
+          }}
+        />
+        <div className="absolute left-1/2 top-0 h-72 w-72 -translate-x-1/2 rounded-full bg-emerald-500/20 blur-[90px]" />
+        <div className="absolute right-0 bottom-0 h-56 w-56 rounded-full bg-teal-400/15 blur-[80px]" />
+        <div className="absolute left-0 top-1/3 h-48 w-48 rounded-full bg-violet-500/10 blur-[80px]" />
+
+        {/* Drifting atmosphere motes. */}
+        {PARTICLES.map((p, i) => (
+          <div
+            key={i}
+            className="absolute bottom-6 rounded-full animate-landing-particle-rise"
+            style={{
+              left: p.left,
+              width: p.size,
+              height: p.size,
+              backgroundColor: p.color,
+              boxShadow: `0 0 6px ${p.color}`,
+              animationDelay: p.delay,
+              animationDuration: p.duration,
+            }}
+          />
+        ))}
+
+        <div className="relative h-[720px]" style={{ perspective: "1800px" }}>
+          <div className="absolute inset-0 animate-landing-inspect" style={{ transformStyle: "preserve-3d" }}>
+            {BUILD_STAGES.map((stage, i) => {
+              const z = i * STAGE_DEPTH - ((count - 1) * STAGE_DEPTH) / 2;
+              const y = -i * STAGE_RISE + ((count - 1) * STAGE_RISE) / 2;
+              const x = i * STAGE_DRIFT - ((count - 1) * STAGE_DRIFT) / 2;
+              const depthFromFront = count - 1 - i;
+              const blurPx = depthFromFront * 0.4;
+              const c = ACCENT_CLASSES[stage.accent];
+              const isBuilt = i < revealCount;
+              const justCompleted = stage.isFinal && revealCount === count;
+              return (
+                <div
+                  key={stage.label}
+                  className="absolute left-1/2 top-1/2 transition-[opacity,transform] duration-500"
+                  style={{
+                    transform: `translate(-50%, -50%) translate(${x}px, ${y}px) translateZ(${z}px) scale(${isBuilt ? 1 : 0.7})`,
+                    transformStyle: "preserve-3d",
+                    transitionTimingFunction: "cubic-bezier(0.34, 1.56, 0.64, 1)",
+                    filter: blurPx > 0 ? `blur(${blurPx}px)` : undefined,
+                    opacity: isBuilt ? (stage.isFinal ? 1 : 0.95 - depthFromFront * 0.02) : 0,
+                  }}
+                >
+                  <div className={`relative ${justCompleted ? "animate-landing-final-pulse" : ""}`} style={{ transformStyle: "preserve-3d" }}>
+                    <PageSheet stage={stage} />
+                    {/* Blueprint-style callout, riding the same 3D transform
+                        as its sheet so it swings with the scene instead of
+                        drifting out of sync with it. */}
+                    <div className="absolute left-full top-1/2 ml-4 flex -translate-y-1/2 items-center gap-2 whitespace-nowrap">
+                      <span className={`h-px w-6 ${stage.isFinal ? "bg-emerald-400/70" : c.dash.replace("border-", "bg-").replace("/40", "/60")}`} />
+                      <span
+                        className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] font-extrabold ${
+                          stage.isFinal ? "bg-emerald-400 text-emerald-950" : `${c.bg} ${c.text} border ${c.border}`
+                        }`}
+                      >
+                        {i + 1}
+                      </span>
+                      <span className={`text-xs font-semibold ${stage.isFinal ? "text-emerald-300" : c.sub}`}>{stage.label}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 export default function LandingPage() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({
@@ -307,6 +541,8 @@ export default function LandingPage() {
           ))}
         </div>
       </section>
+
+      <BuildProcess3D />
 
       {/* Workflow */}
       <section id="workflow" className="py-10">

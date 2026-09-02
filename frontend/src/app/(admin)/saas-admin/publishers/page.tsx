@@ -2,6 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import { API_BASE, apiFetch, getToken } from "@/lib/api";
+import { saveBase64, saveFile } from "@/lib/saveFile";
 
 interface Publisher {
   id: string;
@@ -22,18 +23,11 @@ function usernameFrom(name: string) {
   return name.toLowerCase().replace(/[^a-z0-9]/g, "").slice(0, 14) || "publisher";
 }
 
-function downloadPdf(base64: string, filename: string) {
-  const bytes = atob(base64);
-  const arr = new Uint8Array(bytes.length);
-  for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-  const url = URL.createObjectURL(new Blob([arr], { type: "application/pdf" }));
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
+// Goes through saveBase64 so the PDF is actually written and shared inside
+// the wrapped app; a bare <a download> is inert in a WebView. See
+// lib/saveFile.ts.
+async function downloadPdf(base64: string, filename: string) {
+  return saveBase64(base64, filename, "application/pdf", { shareTitle: filename });
 }
 
 export default function AdminPublishersPage() {
@@ -62,14 +56,9 @@ export default function AdminPublishersPage() {
       setToast("Credentials PDF नहीं मिला.");
       return;
     }
-    const url = URL.createObjectURL(await res.blob());
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${pub.username}-credentials.pdf`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+    const filename = `${pub.username}-credentials.pdf`;
+    const saved = await saveFile(await res.blob(), filename, { shareTitle: filename });
+    if (!saved.ok) setToast(`PDF सेव नहीं हो सका: ${saved.error}`);
   };
 
   const rows = publishers.filter((p) =>
@@ -109,18 +98,79 @@ export default function AdminPublishersPage() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">पब्लिशर</h1>
+          <h1 className="page-title text-2xl font-bold">पब्लिशर</h1>
           <p className="text-sm text-gray-500 mt-1">पब्लिशर ID, password, wallet और credentials manage करें.</p>
         </div>
-        <div className="flex items-center gap-2">
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="खोजें" className="border border-gray-300 rounded-lg px-3 py-2 text-sm w-64" />
-          <button onClick={() => setCreateOpen(true)} className="px-4 py-2 rounded-lg bg-black text-white text-sm font-semibold hover:bg-gray-800">नया पब्लिशर</button>
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="खोजें"
+            type="search"
+            enterKeyHint="search"
+            className="w-full rounded-xl border border-gray-300 px-3.5 py-3 text-base sm:w-64 sm:rounded-lg sm:px-3 sm:py-2 sm:text-sm"
+          />
+          <button onClick={() => setCreateOpen(true)} className="tap shrink-0 btn-brand rounded-xl px-4 py-3 text-sm font-semibold sm:rounded-lg sm:py-2">नया पब्लिशर</button>
         </div>
       </div>
 
       {toast && <div className="p-4 rounded-lg bg-gray-50 border border-gray-200 text-sm font-medium">{toast}</div>}
 
-      <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+      {/* Phones: card per publisher. The action row here is the reason the
+          table can't just scroll sideways -- these are the controls an admin
+          actually comes to this screen to press. */}
+      <div className="space-y-3 sm:hidden">
+        {rows.length === 0 ? (
+          <div className="rounded-xl border border-gray-200 bg-white py-10 text-center text-gray-400">कोई पब्लिशर नहीं मिला.</div>
+        ) : (
+          rows.map((pub) => (
+            <div key={pub.id} className="surface-card p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="truncate font-semibold text-gray-950">{pub.newspaper_name || "-"}</div>
+                  <div className="truncate text-xs text-gray-500">{pub.publisher_name || "-"}</div>
+                </div>
+                <span
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
+                    pub.is_active ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"
+                  }`}
+                >
+                  {pub.is_active ? "Active" : "Suspended"}
+                </span>
+              </div>
+
+              <div className="mt-3 flex items-end justify-between gap-3 border-t border-gray-100 pt-3">
+                <div className="min-w-0">
+                  <div className="truncate font-mono text-sm font-semibold text-gray-900">{pub.username}</div>
+                  <div className="truncate font-mono text-xs text-gray-500">{pub.password || "password उपलब्ध नहीं"}</div>
+                </div>
+                <div className="shrink-0 font-mono font-bold text-gray-900">₹{Number(pub.balance_inr || 0).toFixed(2)}</div>
+              </div>
+
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <button onClick={() => downloadCredentials(pub)} className="tap rounded-xl border border-gray-300 py-2.5 text-xs font-semibold">PDF</button>
+                <button onClick={() => setWalletPub(pub)} className="tap rounded-xl border border-gray-300 py-2.5 text-xs font-semibold">Wallet</button>
+                <button onClick={() => setResetPub(pub)} className="tap btn-ink rounded-xl py-2.5 text-xs font-semibold">Password</button>
+                <button
+                  onClick={() => toggleActive(pub)}
+                  className={`tap rounded-xl border py-2.5 text-xs font-semibold ${
+                    pub.is_active ? "border-red-300 bg-red-50 text-red-700" : "border-green-300 bg-green-50 text-green-700"
+                  }`}
+                >
+                  {pub.is_active ? "Suspend" : "Reactivate"}
+                </button>
+                {pub.settings_locked && (
+                  <button onClick={() => unlockSettings(pub)} className="tap col-span-2 rounded-xl border border-amber-400 bg-amber-50 py-2.5 text-xs font-semibold text-amber-800">
+                    Unlock settings
+                  </button>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="hidden overflow-hidden surface-card sm:block">
         <table className="w-full text-left text-sm">
           <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
             <tr>

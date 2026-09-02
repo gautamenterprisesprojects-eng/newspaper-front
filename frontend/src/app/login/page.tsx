@@ -35,28 +35,54 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-[70vh] flex items-center justify-center">
-      <form onSubmit={handleLogin} className="w-full max-w-md bg-white border border-gray-200 rounded-xl shadow-sm p-8 space-y-5">
+    <div className="flex min-h-[70dvh] items-center justify-center">
+      <form
+        onSubmit={handleLogin}
+        className="rise-in w-full max-w-md space-y-5 rounded-2xl bg-white p-6 sm:border sm:border-[color:var(--hairline)] sm:p-8 sm:shadow-[var(--shadow-lift)]"
+      >
         <div className="text-center">
           <div className="mx-auto w-fit">
-            <PageMintBadge size={48} />
+            <PageMintBadge size={52} />
           </div>
-          <h1 className="mt-4 text-2xl font-bold text-gray-950">लॉगिन</h1>
+          <h1 className="page-title mt-4 text-2xl font-bold">लॉगिन</h1>
           <p className="mt-1 text-sm text-gray-500">एडमिन से मिली यूज़र आईडी और पासवर्ड डालें.</p>
         </div>
         {errorMsg && <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm font-medium text-center">{errorMsg}</div>}
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1.5">यूज़र आईडी</label>
-          <input value={username} onChange={(e) => setUsername(e.target.value)} required className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          {/* autoCapitalize/autoCorrect off: phone keyboards otherwise
+              capitalise and autocorrect the first character of a username,
+              which silently breaks the login for the user. */}
+          <input
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            name="username"
+            autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            enterKeyHint="next"
+            className="w-full rounded-xl border border-gray-300 px-3.5 py-3 text-base focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 sm:rounded-lg sm:py-2.5 sm:text-sm"
+          />
         </div>
         <div>
           <label className="block text-xs font-semibold text-gray-700 mb-1.5">पासवर्ड</label>
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500" />
+          <input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            name="password"
+            autoComplete="current-password"
+            enterKeyHint="go"
+            className="w-full rounded-xl border border-gray-300 px-3.5 py-3 text-base focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/30 sm:rounded-lg sm:py-2.5 sm:text-sm"
+          />
           <p className="mt-2 text-xs text-gray-500">पासवर्ड भूल गए हैं तो अपने एडमिन से नया पासवर्ड लें.</p>
         </div>
         <button
           disabled={loading}
-          className="w-full py-2.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-sm font-semibold shadow-md shadow-emerald-500/25 transition-all hover:from-emerald-500 hover:to-teal-500 hover:shadow-lg hover:shadow-emerald-500/35 disabled:opacity-50"
+          className="tap btn-brand w-full rounded-xl py-3.5 text-base font-semibold disabled:opacity-50 sm:rounded-lg sm:py-2.5 sm:text-sm"
         >
           {loading ? "जांच हो रही है..." : "लॉगिन करें"}
         </button>
