@@ -12,6 +12,7 @@ const NAV_ITEMS = [
   { name: "आवेदन", href: "/saas-admin/requests", icon: "A" },
   { name: "पब्लिशर", href: "/saas-admin/publishers", icon: "P" },
   { name: "दर", href: "/saas-admin/pricing", icon: "₹" },
+  { name: "डिवाइस", href: "/saas-admin/devices", icon: "D" },
 ];
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {

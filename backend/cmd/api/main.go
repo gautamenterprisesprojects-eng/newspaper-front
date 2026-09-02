@@ -37,6 +37,12 @@ func main() {
 		// Fiber's 4MB default is too small once the setup wizard's front/inside
 		// header images are sent as base64 data URLs in the JSON body.
 		BodyLimit: 20 * 1024 * 1024,
+		// Both nginx layers already send X-Forwarded-For; without this Fiber
+		// reads the socket peer instead, which is always the nginx container
+		// (172.16.x). Every row in login_logs recorded that one address
+		// rather than a real visitor -- an audit trail that could not answer
+		// the only question anyone ever asks of it.
+		ProxyHeader: fiber.HeaderXForwardedFor,
 	})
 
 	// Security & Observability Defenses
@@ -71,6 +77,14 @@ func main() {
 	auth := app.Group("/api/v1/auth")
 	auth.Post("/login", handlers.SaaSAuthLogin)
 	auth.Post("/request-access", handlers.SaaSRequestAccess)
+	// The one-time link's landing handshake. Public by necessity -- it is
+	// the only door an unenrolled browser is allowed through.
+	auth.Post("/enrol/begin", handlers.SaaSEnrolBegin)
+
+	// Called by nginx's auth_request, never by a browser directly; both are
+	// restricted to the internal network in the nginx config.
+	app.Get("/internal/device-check", handlers.SaaSDeviceCheck)
+	app.Get("/internal/generator-check", handlers.SaaSGeneratorCheck)
 	auth.Get("/pricing", handlers.SaaSGetPricing)
 
 	// -------------------------------------------------------------------------
@@ -95,6 +109,7 @@ func main() {
 	pub.Get("/masthead-teasers/:publisher_id", handlers.SaaSGetMastheadTeasers)
 	pub.Post("/youth-update-inside-author", handlers.SaaSSaveYouthUpdateInsideAuthor)
 	pub.Get("/youth-update-inside-author/:publisher_id", handlers.SaaSGetYouthUpdateInsideAuthor)
+	pub.Post("/generator/launch-token", handlers.SaaSGeneratorLaunchToken)
 
 	// -------------------------------------------------------------------------
 	// ADMIN CONTROL PANEL ENDPOINTS
@@ -110,6 +125,10 @@ func main() {
 	admin.Post("/publishers/:publisher_id/reset-password", handlers.SaaSAdminResetPassword)
 	admin.Post("/publishers/:publisher_id/unlock-settings", handlers.SaaSAdminUnlockSettings)
 	admin.Post("/publishers/:publisher_id/set-active", handlers.SaaSAdminSetPublisherActive)
+	admin.Get("/devices", handlers.SaaSAdminListDevices)
+	admin.Get("/device-blocks", handlers.SaaSAdminDeviceBlocks)
+	admin.Post("/publishers/:publisher_id/enrolment-link", handlers.SaaSAdminIssueEnrolmentLink)
+	admin.Post("/devices/:device_id/revoke", handlers.SaaSAdminRevokeDevice)
 
 	// Graceful Shutdown Protocol
 	go func() {

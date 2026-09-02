@@ -408,25 +408,49 @@ export default function PublisherDashboard() {
     return params;
   };
 
-  const openGenerator = (
+  // The generator only serves a page to a real dashboard launch. This token
+  // is that proof -- it rides in the URL alongside the other launch params,
+  // deliberately not in a cookie: a batch run loads the generator inside a
+  // hidden iframe, where cookie delivery depends on the viewer's
+  // third-party-cookie settings and would fail for some publishers only.
+  const attachLaunchToken = async (params: URLSearchParams): Promise<URLSearchParams> => {
+    try {
+      const res = await apiFetch("/publisher/generator/launch-token", { method: "POST" });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.launch_token) {
+        params.set("lt", data.launch_token);
+      }
+    } catch {
+      // Deliberately non-fatal: with the device gate off the generator
+      // ignores the token entirely, and failing the launch here would break
+      // generation for a check that is not even active.
+    }
+    return params;
+  };
+
+  const openGenerator = async (
     mode: GenerateMode,
     pageCount: number,
     finalIssueNumber = issueNumber,
     pageNumber?: number,
     chargeOnExport = false,
   ) => {
-    const params = buildGeneratorParams(mode, pageCount, finalIssueNumber, pageNumber, chargeOnExport);
+    const params = await attachLaunchToken(
+      buildGeneratorParams(mode, pageCount, finalIssueNumber, pageNumber, chargeOnExport),
+    );
     window.location.href = `${GENERATOR_URL}?${params.toString()}`;
   };
 
   const openSinglePageWithoutDebit = (pageNumber: number) => {
     const finalDate = publicationDate || today();
     const finalIssueNumber = getIssueNumber(issueNumber, finalDate);
-    openGenerator("single", defaultPages, finalIssueNumber, pageNumber, true);
+    void openGenerator("single", defaultPages, finalIssueNumber, pageNumber, true);
   };
 
-  const startBatchGeneration = (pageCount: number, finalIssueNumber: string, frontTemplateIndex?: number) => {
-    const params = buildGeneratorParams("batch", pageCount, finalIssueNumber, undefined, false, frontTemplateIndex);
+  const startBatchGeneration = async (pageCount: number, finalIssueNumber: string, frontTemplateIndex?: number) => {
+    const params = await attachLaunchToken(
+      buildGeneratorParams("batch", pageCount, finalIssueNumber, undefined, false, frontTemplateIndex),
+    );
     const initialPages: BatchPageState[] = Array.from({ length: pageCount }, (_, i) => {
       const pageNumber = i + 1;
       const section = pageSections.find((page) => page.page_number === pageNumber);
@@ -577,7 +601,7 @@ export default function PublisherDashboard() {
 
     setBalance(Number(data.remaining_balance));
     if (data.volume_number !== undefined && data.volume_number !== null) setVolumeNumber(Number(data.volume_number));
-    startBatchGeneration(defaultPages, finalIssueNumber, Number(data.front_template_index) || 0);
+    await startBatchGeneration(defaultPages, finalIssueNumber, Number(data.front_template_index) || 0);
   };
 
   const handleGenerate = async (mode: GenerateMode, pageCount: number, pageNumber?: number) => {

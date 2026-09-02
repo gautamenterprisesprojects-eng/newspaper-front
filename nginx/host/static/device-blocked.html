@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="hi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PageMint — डिवाइस रजिस्टर नहीं है</title>
+<style>
+  :root { color-scheme: light; }
+  body {
+    margin: 0; min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+    background: #F6F8F7; color: #0F1A17; padding: 24px;
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.6;
+  }
+  .card {
+    background: #fff; border: 1px solid #DDE5E2; border-radius: 16px; padding: 32px 28px;
+    max-width: 440px; width: 100%; text-align: center;
+  }
+  h1 { font-size: 1.35rem; margin: 0 0 12px; }
+  p { margin: 0 0 16px; color: #4A5A55; font-size: 0.95rem; }
+  .contact { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+  a.btn {
+    display: block; padding: 13px 18px; border-radius: 10px; text-decoration: none;
+    font-weight: 600; font-size: 0.95rem;
+  }
+  a.call { background: #0E7C66; color: #fff; }
+  a.wa { border: 1px solid #DDE5E2; color: #0F1A17; }
+  .note { font-size: 0.8rem; color: #7C8A86; margin-top: 20px; margin-bottom: 0; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>यह डिवाइस रजिस्टर नहीं है</h1>
+    <!-- Says what happened and what to do about it. A bare 403 reads as "the
+         site is down" and produces a phone call with no information in it. -->
+    <p>आपका अकाउंट सिर्फ़ रजिस्टर किए हुए ब्राउज़र में खुलता है. अगर आपने ब्राउज़र बदला है, नया फ़ोन/लैपटॉप लिया है, या ब्राउज़र का डेटा साफ़ किया है — तो एडमिन से नया रजिस्ट्रेशन लिंक लें.</p>
+    <div class="contact">
+      <a class="btn call" href="tel:7999079051">कॉल करें — 7999079051</a>
+      <a class="btn wa" href="https://wa.me/917999079051">WhatsApp पर संदेश भेजें</a>
+    </div>
+    <p class="note">लिंक मिलते ही उसी ब्राउज़र में खोलें जिसमें रोज़ काम करना है.</p>
+  </div>
+</body>
+</html>

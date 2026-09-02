@@ -7,6 +7,7 @@ import (
 
 	"github.com/enterprise/newspaper-portal-backend/internal/config"
 	"github.com/enterprise/newspaper-portal-backend/internal/database"
+	"github.com/enterprise/newspaper-portal-backend/internal/handlers"
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/helmet"
 	"github.com/golang-jwt/jwt/v5"
@@ -88,6 +89,25 @@ func ZeroTrustAuth() fiber.Handler {
 					"success":    false,
 					"error_code": "ERR_ACCOUNT_SUSPENDED",
 					"message":    "This account has been suspended or no longer exists",
+					"timestamp":  time.Now().UTC().Format(time.RFC3339),
+				})
+			}
+		}
+
+		// A validly signed token is still not enough once the device gate is
+		// on: it must have been issued to a browser that is still enrolled.
+		// This is what stops a token being lifted off the bound browser and
+		// replayed from somewhere else -- the login check alone cannot,
+		// since it never runs again for the token's whole 72-hour life.
+		// Tokens minted before the gate existed carry no claim at all, which
+		// is why the cutover invalidates every outstanding session.
+		if handlers.DeviceGateEnabled() && userID != "" {
+			deviceID := stringClaim(claims, "did")
+			if !handlers.DeviceIsLiveForAccount(deviceID, userID) {
+				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
+					"success":    false,
+					"error_code": "ERR_DEVICE_NOT_ENROLLED",
+					"message":    "यह डिवाइस अब अधिकृत नहीं है. एडमिन से संपर्क करें: 7999079051",
 					"timestamp":  time.Now().UTC().Format(time.RFC3339),
 				})
 			}

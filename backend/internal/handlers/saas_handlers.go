@@ -217,6 +217,22 @@ func SaaSAuthLogin(c *fiber.Ctx) error {
 		return c.Status(401).JSON(fiber.Map{"error": "You do not have access to this platform."})
 	}
 
+	// The password is correct -- but with the device gate on, credentials
+	// alone are not enough: this browser must be one an admin enrolled, or
+	// be carrying a live one-time link. Deliberately checked AFTER the
+	// password so a wrong-device attempt cannot be used to probe which
+	// usernames exist.
+	deviceDecision := CheckLoginDevice(c, pub.ID, pub.Role)
+	if !deviceDecision.Allowed {
+		database.DB.Exec(
+			"INSERT INTO login_logs (username, ip_address, user_agent, status) VALUES ($1, $2, $3, $4)",
+			pub.Username, c.IP(), c.Get("User-Agent"), deviceDecision.Status)
+		return c.Status(403).JSON(fiber.Map{
+			"error":      "यह डिवाइस इस अकाउंट के लिए अधिकृत नहीं है. एडमिन से संपर्क करें: 7999079051",
+			"error_code": "ERR_DEVICE_NOT_ENROLLED",
+		})
+	}
+
 	// Check if setup wizard is finished in publisher_profiles
 	var isSetupCompleted bool
 	_ = database.DB.Get(&isSetupCompleted, "SELECT is_setup_completed FROM publisher_profiles WHERE publisher_id = $1", pub.ID)
@@ -230,6 +246,10 @@ func SaaSAuthLogin(c *fiber.Ctx) error {
 		"username": pub.Username,
 		"role":     pub.Role,
 		"exp":      time.Now().Add(72 * time.Hour).Unix(),
+		// The browser this token was issued to. Re-checked on every API
+		// request, so a token copied to another machine stops working there
+		// even though it is still validly signed.
+		"did": deviceDecision.DeviceID,
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 	tokenStr, err := token.SignedString(config.JWTSecret())
@@ -238,7 +258,14 @@ func SaaSAuthLogin(c *fiber.Ctx) error {
 		return c.Status(500).JSON(fiber.Map{"error": "Could not issue an access token."})
 	}
 
-	database.DB.Exec("INSERT INTO login_logs (username, ip_address, user_agent, status) VALUES ($1, $2, $3, $4)", pub.Username, c.IP(), c.Get("User-Agent"), "SUCCESS")
+	// via_admin_device separates an admin testing a publisher account from
+	// that publisher's own session -- they look identical otherwise, and
+	// generating debits the publisher's wallet.
+	database.DB.Exec(
+		`INSERT INTO login_logs (username, ip_address, user_agent, status, device_id, via_admin_device)
+		 VALUES ($1, $2, $3, $4, NULLIF($5, '')::uuid, $6)`,
+		pub.Username, c.IP(), c.Get("User-Agent"), "SUCCESS",
+		deviceDecision.DeviceID, deviceDecision.ViaAdminDevice)
 
 	return c.JSON(fiber.Map{
 		"token":              tokenStr,
