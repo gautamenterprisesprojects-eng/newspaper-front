@@ -68,6 +68,19 @@ func DeviceGateEnabled() bool {
 	return v == "true" || v == "1" || v == "yes"
 }
 
+// ClientIP is the visitor's own address. Fiber's ProxyHeader hands back the
+// whole X-Forwarded-For chain ("122.175.210.152, 172.16.2.1") when a request
+// crossed two proxies, as every request here does -- host nginx, then the
+// compose nginx. The first entry is the client; the rest are our own hops and
+// only make the audit trail harder to read.
+func ClientIP(c *fiber.Ctx) string {
+	raw := c.IP()
+	if idx := strings.Index(raw, ","); idx >= 0 {
+		raw = raw[:idx]
+	}
+	return strings.TrimSpace(raw)
+}
+
 func hashSecret(secret string) string {
 	sum := sha256.Sum256([]byte(strings.TrimSpace(secret)))
 	return hex.EncodeToString(sum[:])
@@ -215,7 +228,7 @@ func CheckLoginDevice(c *fiber.Ctx, publisherID, role string) DeviceDecision {
 		if isAdminDevice || device.PublisherID == publisherID {
 			database.DB.Exec(
 				"UPDATE account_devices SET last_seen = NOW(), last_ip = $1 WHERE id = $2",
-				c.IP(), device.ID)
+				ClientIP(c), device.ID)
 			return DeviceDecision{
 				Allowed:  true,
 				DeviceID: device.ID,
@@ -269,7 +282,7 @@ func CheckLoginDevice(c *fiber.Ctx, publisherID, role string) DeviceDecision {
 	if err := tx.QueryRow(
 		`INSERT INTO account_devices (publisher_id, device_hash, trust_level, user_agent, first_ip, last_ip)
 		 VALUES ($1, $2, $3, $4, $5, $5) RETURNING id`,
-		publisherID, hashSecret(secret), trustLevelFor(role), c.Get("User-Agent"), c.IP(),
+		publisherID, hashSecret(secret), trustLevelFor(role), c.Get("User-Agent"), ClientIP(c),
 	).Scan(&deviceID); err != nil {
 		log.Printf("device binding insert failed for %s: %v", publisherID, err)
 		return DeviceDecision{Status: "DEVICE_BLOCKED"}

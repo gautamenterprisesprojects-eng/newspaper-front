@@ -206,14 +206,14 @@ func SaaSAuthLogin(c *fiber.Ctx) error {
 	err := database.DB.Get(&pub, "SELECT id, username, password_hash, role, is_active FROM publishers WHERE username = $1 AND is_active = TRUE", input.Username)
 	if err != nil {
 		// Log attempted username without revealing existence to client
-		database.DB.Exec("INSERT INTO login_logs (username, ip_address, user_agent, status) VALUES ($1, $2, $3, $4)", input.Username, c.IP(), c.Get("User-Agent"), "FAILED_USER_NOT_FOUND")
+		database.DB.Exec("INSERT INTO login_logs (username, ip_address, user_agent, status) VALUES ($1, $2, $3, $4)", input.Username, ClientIP(c), c.Get("User-Agent"), "FAILED_USER_NOT_FOUND")
 		return c.Status(401).JSON(fiber.Map{"error": "You do not have access to this platform."})
 	}
 
 	// The stored bcrypt hash is the only accepted proof of identity. There is no
 	// shared master password: one literal in the source would unlock every account.
 	if err = bcrypt.CompareHashAndPassword([]byte(pub.PasswordHash), []byte(input.Password)); err != nil {
-		database.DB.Exec("INSERT INTO login_logs (username, ip_address, user_agent, status) VALUES ($1, $2, $3, $4)", input.Username, c.IP(), c.Get("User-Agent"), "FAILED_INVALID_PASSWORD")
+		database.DB.Exec("INSERT INTO login_logs (username, ip_address, user_agent, status) VALUES ($1, $2, $3, $4)", input.Username, ClientIP(c), c.Get("User-Agent"), "FAILED_INVALID_PASSWORD")
 		return c.Status(401).JSON(fiber.Map{"error": "You do not have access to this platform."})
 	}
 
@@ -226,7 +226,7 @@ func SaaSAuthLogin(c *fiber.Ctx) error {
 	if !deviceDecision.Allowed {
 		database.DB.Exec(
 			"INSERT INTO login_logs (username, ip_address, user_agent, status) VALUES ($1, $2, $3, $4)",
-			pub.Username, c.IP(), c.Get("User-Agent"), deviceDecision.Status)
+			pub.Username, ClientIP(c), c.Get("User-Agent"), deviceDecision.Status)
 		return c.Status(403).JSON(fiber.Map{
 			"error":      "यह डिवाइस इस अकाउंट के लिए अधिकृत नहीं है. एडमिन से संपर्क करें: 7999079051",
 			"error_code": "ERR_DEVICE_NOT_ENROLLED",
@@ -264,7 +264,7 @@ func SaaSAuthLogin(c *fiber.Ctx) error {
 	database.DB.Exec(
 		`INSERT INTO login_logs (username, ip_address, user_agent, status, device_id, via_admin_device)
 		 VALUES ($1, $2, $3, $4, NULLIF($5, '')::uuid, $6)`,
-		pub.Username, c.IP(), c.Get("User-Agent"), "SUCCESS",
+		pub.Username, ClientIP(c), c.Get("User-Agent"), "SUCCESS",
 		deviceDecision.DeviceID, deviceDecision.ViaAdminDevice)
 
 	return c.JSON(fiber.Map{
