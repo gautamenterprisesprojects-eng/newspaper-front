@@ -16,22 +16,13 @@ export default function SiteChrome({ children }: { children: React.ReactNode }) 
 
   if (isAdminRoute || isPublisherRoute) return <>{children}</>;
 
+  // No top bar on the public routes at all. It went out with the landing
+  // page: once the marketing nav and the login CTA were removed, the bar
+  // held nothing but the wordmark, above a login card that carries its own
+  // logo. The footer wordmark still links home for anyone who wants it.
+
   return (
     <div className="min-h-screen bg-white text-gray-900">
-      <header className="sticky top-0 z-50 h-[72px] bg-white/95 backdrop-blur border-b border-gray-200">
-        <div className="max-w-6xl mx-auto h-full px-4 sm:px-6 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-3">
-            <PageMintBadge size={40} />
-            <span className="font-extrabold text-lg tracking-tight text-gray-950">PageMint</span>
-          </Link>
-          {/* The marketing nav (सुविधाएं / कैसे काम करता है) and the publisher
-              login CTA are gone with the landing page they pointed at: the
-              anchors #features/#workflow only ever existed on it, and the
-              root now redirects to /login, so the CTA would be a button
-              back to the page you are already on. Only the wordmark is
-              left, which doubles as that same "back to login" link. */}
-        </div>
-      </header>
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8">{children}</main>
       <footer className="border-t border-gray-200 bg-gray-50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
