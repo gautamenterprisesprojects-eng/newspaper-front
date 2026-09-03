@@ -107,7 +107,7 @@ func ZeroTrustAuth() fiber.Handler {
 				return c.Status(fiber.StatusForbidden).JSON(fiber.Map{
 					"success":    false,
 					"error_code": "ERR_DEVICE_NOT_ENROLLED",
-					"message":    "यह डिवाइस अब अधिकृत नहीं है. एडमिन से संपर्क करें: 7999079051",
+					"message":    "यह डिवाइस अब अधिकृत नहीं है. एडमिन से संपर्क करें: 9303108665",
 					"timestamp":  time.Now().UTC().Format(time.RFC3339),
 				})
 			}

@@ -102,9 +102,9 @@ function EnrolForm() {
           <div className="rounded-lg bg-gray-50 border border-gray-200 p-4 text-center text-sm text-gray-600">
             नया लिंक लेने के लिए एडमिन से संपर्क करें:
             <br />
-            <a href="tel:7999079051" className="font-semibold text-emerald-700">7999079051</a>
+            <a href="tel:9303108665" className="font-semibold text-emerald-700">9303108665</a>
             <span className="text-gray-400"> · </span>
-            <a href="https://wa.me/917999079051" className="font-semibold text-emerald-700">WhatsApp</a>
+            <a href="https://wa.me/919303108665" className="font-semibold text-emerald-700">WhatsApp</a>
           </div>
         )}
 
