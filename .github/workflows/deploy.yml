@@ -68,7 +68,7 @@ jobs:
       - name: Verify Frontend Types and Next.js Build Integrity
         run: |
           cd frontend
-          npm ci
+          npm ci --legacy-peer-deps
           npm run lint || true
           npx tsc --noEmit
           npm run build
