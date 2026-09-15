@@ -23,6 +23,7 @@ const NEWSWIRE_CATEGORIES = [
   "Business",
   "Health",
   "Entertainment",
+  "NMS",
 ];
 
 const DEFAULT_THEME_COLOR = "#0f6f83"; // matches the generator's own accentColor default
