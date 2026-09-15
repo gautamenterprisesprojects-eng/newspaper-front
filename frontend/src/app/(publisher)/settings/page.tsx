@@ -2,19 +2,15 @@
 
 import React, { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiFetch, getPublisherId } from "@/lib/api";
+import { apiFetch, getPublisherId, getUsername } from "@/lib/api";
 import { isTourEnabled, setTourEnabled, startTour } from "@/components/tour/tourSteps";
 
 type PageSection = { page_number: number; section: string; header_type: string; notes: string; categories: string[] };
 type Edition = { name: string; front_header_url: string; inside_header_url: string; frontHeaderName?: string; insideHeaderName?: string };
 
 // Must be byte-identical to NEWSWIRE_CATEGORIES in the generator
-// (src/lib/newswire.ts) — the generator reads page_sections[].categories
-// straight through with no translation layer, so a value here that doesn't
-// exist on that side is silently rejected by the generator's /api/newswire
-// route and the page falls back to guessing a category from the section
-// name instead. See profile/page.tsx history for the drift this caused
-// before ("Madhyapradesh" vs "Madhya Pradesh", etc.).
+// (src/lib/newswire.ts). "NMS Bundle" is the one extra label, shown only
+// for cliffdemo3 — the generator accepts that string for that publisher.
 const NEWSWIRE_CATEGORIES = [
   "National",
   "Madhya Pradesh",
@@ -24,6 +20,24 @@ const NEWSWIRE_CATEGORIES = [
   "Health",
   "Entertainment",
 ];
+
+const CLIFFDEMO3_USERNAME = "cliffdemo3";
+const CLIFFDEMO3_NMS_CATEGORY = "NMS Bundle";
+
+const isCliffDemo3Username = (username: string | null | undefined) =>
+  (username || "").trim().toLowerCase() === CLIFFDEMO3_USERNAME;
+
+const categoryOptionsFor = (cliffDemo3: boolean) =>
+  cliffDemo3 ? [...NEWSWIRE_CATEGORIES, CLIFFDEMO3_NMS_CATEGORY] : NEWSWIRE_CATEGORIES;
+
+const isAllowedSettingsCategory = (category: string, cliffDemo3: boolean) =>
+  categoryOptionsFor(cliffDemo3).includes(category);
+
+const pickerOptionsFor = (pageNumber: number, cliffDemo3: boolean) =>
+  cliffDemo3 && pageNumber === 1 ? [CLIFFDEMO3_NMS_CATEGORY] : categoryOptionsFor(cliffDemo3);
+
+const categoriesForSettingsPage = (pageNumber: number, cliffDemo3: boolean, categories: string[]) =>
+  cliffDemo3 && pageNumber === 1 ? [CLIFFDEMO3_NMS_CATEGORY] : categories;
 
 const DEFAULT_THEME_COLOR = "#0f6f83"; // matches the generator's own accentColor default
 
@@ -35,13 +49,13 @@ const DEFAULT_THEME_COLOR = "#0f6f83"; // matches the generator's own accentColo
 // being switched. Category selection is meaningless for either signal.
 const isEditorialSectionName = (name: string) => name.trim().toLowerCase() === "editorial";
 
-const defaultSections = (count: number): PageSection[] =>
+const defaultSections = (count: number, cliffDemo3 = false): PageSection[] =>
   Array.from({ length: count }, (_, i) => ({
     page_number: i + 1,
     section: i === 0 ? "मुख्य पेज" : "सामान्य खबरें",
     header_type: i === 0 ? "front" : "inside",
     notes: "",
-    categories: [i === 0 ? "National" : "Madhya Pradesh"],
+    categories: [i === 0 ? (cliffDemo3 ? CLIFFDEMO3_NMS_CATEGORY : "National") : "Madhya Pradesh"],
   }));
 
 const YOUTH_UPDATE_PUBLISHER_ID = "85a50d12-8aa3-4f88-93aa-8153443c1c98";
@@ -99,13 +113,19 @@ export default function PublisherSettingsPage() {
   const [saving, setSaving] = useState(false);
   const router = useRouter();
   const [tourOn, setTourOn] = useState(true);
+  const [isCliffDemo3, setIsCliffDemo3] = useState(false);
 
   // localStorage is client-only; read after mount to avoid a hydration split.
-  useEffect(() => setTourOn(isTourEnabled()), []);
+  useEffect(() => {
+    setTourOn(isTourEnabled());
+    setIsCliffDemo3(isCliffDemo3Username(getUsername()));
+  }, []);
 
   useEffect(() => {
     const publisherId = getPublisherId();
     if (!publisherId) return;
+    const cliffDemo3 = isCliffDemo3Username(getUsername());
+    setIsCliffDemo3(cliffDemo3);
     apiFetch(`/publisher/profile/${publisherId}`).then((r) => r.json()).then((d) => {
       if (!d) return;
       setThemeColor(d.theme_color || DEFAULT_THEME_COLOR);
@@ -130,16 +150,26 @@ export default function PublisherSettingsPage() {
       if (savedSections.length > 0) {
         setPageCount(savedSections.length);
         setPageSections(
-          savedSections.map((p) => ({
-            page_number: p.page_number,
-            section: p.section,
-            header_type: p.header_type,
-            notes: p.notes || "",
-            categories: Array.isArray(p.categories) && p.categories.length ? p.categories.filter((c) => NEWSWIRE_CATEGORIES.includes(c)) : [p.page_number === 1 ? "National" : "Madhya Pradesh"],
-          })),
+          savedSections.map((p) => {
+            const filtered = Array.isArray(p.categories) && p.categories.length
+              ? p.categories.filter((c) => isAllowedSettingsCategory(c, cliffDemo3))
+              : [];
+            const fallback = p.page_number === 1
+              ? (cliffDemo3 ? CLIFFDEMO3_NMS_CATEGORY : "National")
+              : "Madhya Pradesh";
+            return {
+              page_number: p.page_number,
+              section: p.section,
+              header_type: p.header_type,
+              notes: p.notes || "",
+              categories: categoriesForSettingsPage(p.page_number, cliffDemo3, filtered.length ? filtered : [fallback]),
+            };
+          }),
         );
       } else if (publisherId === YOUTH_UPDATE_PUBLISHER_ID) {
         setPageSections(youthUpdateSections(8));
+      } else if (cliffDemo3) {
+        setPageSections(defaultSections(8, true));
       }
 
       setLocked(Boolean(d.settings_locked));
@@ -149,8 +179,8 @@ export default function PublisherSettingsPage() {
 
   useEffect(() => {
     if (locked || !loaded) return;
-    setPageSections((prev) => Array.from({ length: pageCount }, (_, i) => prev.find((p) => p.page_number === i + 1) || defaultSections(pageCount)[i]));
-  }, [pageCount, locked, loaded]);
+    setPageSections((prev) => Array.from({ length: pageCount }, (_, i) => prev.find((p) => p.page_number === i + 1) || defaultSections(pageCount, isCliffDemo3)[i]));
+  }, [pageCount, locked, loaded, isCliffDemo3]);
 
   const updateEdition = (index: number, patch: Partial<Edition>) => {
     setEditions((current) => current.map((ed, i) => (i === index ? { ...ed, ...patch } : ed)));
@@ -172,6 +202,9 @@ export default function PublisherSettingsPage() {
     setPageSections((rows) =>
       rows.map((p) => {
         if (p.page_number !== pageNumber) return p;
+        if (isCliffDemo3 && pageNumber === 1) {
+          return { ...p, categories: [CLIFFDEMO3_NMS_CATEGORY] };
+        }
         const has = p.categories.includes(category);
         if (has && p.categories.length === 1) return p; // at least one category required
         return { ...p, categories: has ? p.categories.filter((c) => c !== category) : [...p.categories, category] };
@@ -196,7 +229,10 @@ export default function PublisherSettingsPage() {
           editions: editions
             .map((ed) => ({ name: ed.name.trim(), front_header_url: ed.front_header_url, inside_header_url: ed.inside_header_url }))
             .filter((ed) => ed.name || ed.front_header_url || ed.inside_header_url),
-          page_sections: pageSections.map((p) => ({ ...p, category: p.categories[0] || "" })),
+          page_sections: pageSections.map((p) => {
+            const categories = categoriesForSettingsPage(p.page_number, isCliffDemo3, p.categories);
+            return { ...p, categories, category: categories[0] || "" };
+          }),
         }),
       });
       const data = await res.json().catch(() => null);
@@ -356,29 +392,38 @@ export default function PublisherSettingsPage() {
                   <option value="editorial">Editorial page</option>
                   <option value="advertisement">Advertisement page</option>
                 </select>
-                {page.page_number === 1 || page.header_type === "editorial" || isEditorialSectionName(page.section) ? (
+                {page.header_type === "editorial" || isEditorialSectionName(page.section) ? (
                   <p className="text-[11px] text-gray-500 italic">
-                    {page.page_number === 1
-                      ? "फ्रंट पेज खुद-ब-खुद कई categories की मिली-जुली खबरों से बनता है — यहां category चुनने की ज़रूरत नहीं."
-                      : "एडिटोरियल पेज की अपनी अलग content व्यवस्था है (राशिफल + डेस्क कॉपी) — category यहां लागू नहीं होती."}
+                    एडिटोरियल पेज की अपनी अलग content व्यवस्था है (राशिफल + डेस्क कॉपी) — category यहां लागू नहीं होती.
+                  </p>
+                ) : page.page_number === 1 && !isCliffDemo3 ? (
+                  <p className="text-[11px] text-gray-500 italic">
+                    फ्रंट पेज खुद-ब-खुद कई categories की मिली-जुली खबरों से बनता है — यहां category चुनने की ज़रूरत नहीं.
                   </p>
                 ) : (
-                  <div className="flex flex-wrap gap-2">
-                    {NEWSWIRE_CATEGORIES.map((c) => {
-                      const checked = page.categories.includes(c);
-                      return (
-                        <button
-                          key={c}
-                          type="button"
-                          disabled={locked}
-                          onClick={() => toggleCategory(page.page_number, c)}
-                          className={`tap min-h-[36px] rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-60 sm:min-h-0 sm:rounded-md sm:px-2 sm:py-1 sm:text-[11px] ${checked ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-300"}`}
-                        >
-                          {c}
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <>
+                    <div className="flex flex-wrap gap-2">
+                      {pickerOptionsFor(page.page_number, isCliffDemo3).map((c) => {
+                        const checked = page.categories.includes(c);
+                        return (
+                          <button
+                            key={c}
+                            type="button"
+                            disabled={locked || (isCliffDemo3 && page.page_number === 1)}
+                            onClick={() => toggleCategory(page.page_number, c)}
+                            className={`tap min-h-[36px] rounded-lg border px-3 py-1.5 text-xs font-semibold disabled:opacity-60 sm:min-h-0 sm:rounded-md sm:px-2 sm:py-1 sm:text-[11px] ${checked ? "bg-black text-white border-black" : "bg-white text-gray-600 border-gray-300"}`}
+                          >
+                            {c}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    {isCliffDemo3 && page.page_number === 1 ? (
+                      <p className="text-[11px] text-gray-500 italic">
+                        cliffdemo3 फ्रंट पेज NMS Bundle की खबरों से भरता है — मिला-जुला mix यहां नहीं चलता.
+                      </p>
+                    ) : null}
+                  </>
                 )}
                 <input
                   disabled={locked}
