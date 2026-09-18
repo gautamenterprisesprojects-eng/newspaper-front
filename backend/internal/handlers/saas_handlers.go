@@ -140,7 +140,8 @@ const dateOnlyLayout = "2006-01-02"
 // next edition's volume number instead of it silently disappearing. Returns
 // ok=false when there's nothing to compute from yet (no starting volume set,
 // or either date fails to parse) — callers should leave the profile
-// untouched in that case rather than inventing a baseline.
+// untouched in that case rather than inventing a baseline. A same-date (or
+// earlier) regeneration returns the current volume unchanged.
 func nextVolumeNumber(publicationType string, lastVolumeNumber sql.NullInt64, lastPublishedDate sql.NullString, newPublicationDate string) (int, bool) {
 	if !lastVolumeNumber.Valid || !lastPublishedDate.Valid || lastPublishedDate.String == "" || newPublicationDate == "" {
 		return 0, false
@@ -161,10 +162,11 @@ func nextVolumeNumber(publicationType string, lastVolumeNumber sql.NullInt64, la
 		increment = int(math.Round(float64(daysElapsed) / 7.0))
 	}
 	if increment < 1 {
-		// Regenerating the same (or an earlier) date doesn't retroactively
-		// change the volume number — always advance by at least one edition
-		// for a fresh generation call.
-		increment = 1
+		// Regenerating the same (or an earlier) date is the same edition, not
+		// a new one — the volume number stays put. Only a later publication
+		// date advances it, so a publisher can regenerate pages all day
+		// without the Ank climbing on every click.
+		return int(lastVolumeNumber.Int64), true
 	}
 
 	return int(lastVolumeNumber.Int64) + increment, true
@@ -1389,6 +1391,7 @@ func SaaSExecuteGeneration(c *fiber.Ctx) error {
 	pageSections := body.PageSections
 	var newVolumeNumber int
 	var hasVolume bool
+	var lastVolumeNumber sql.NullInt64
 
 	if database.DB != nil && body.PublisherID != "" {
 		var volumeState struct {
@@ -1397,6 +1400,7 @@ func SaaSExecuteGeneration(c *fiber.Ctx) error {
 			LastPublishedDate sql.NullString `db:"last_published_date"`
 		}
 		if err := database.DB.Get(&volumeState, "SELECT publication_type, last_volume_number, last_published_date::text FROM publisher_profiles WHERE publisher_id = $1", body.PublisherID); err == nil {
+			lastVolumeNumber = volumeState.LastVolumeNumber
 			newVolumeNumber, hasVolume = nextVolumeNumber(volumeState.PublicationType, volumeState.LastVolumeNumber, volumeState.LastPublishedDate, body.PublicationDate)
 		}
 	}
@@ -1483,8 +1487,10 @@ func SaaSExecuteGeneration(c *fiber.Ctx) error {
 
 		// Persist the advanced volume number + this edition's date as the new
 		// baseline for next time — only when the publisher has actually set a
-		// starting volume (hasVolume); otherwise there's nothing to advance.
-		if hasVolume {
+		// starting volume (hasVolume) and the volume actually moved; a same-day
+		// regenerate leaves both columns alone so the baseline date never
+		// drifts backwards.
+		if hasVolume && newVolumeNumber != int(lastVolumeNumber.Int64) {
 			if _, err := tx.Exec(
 				"UPDATE publisher_profiles SET last_volume_number = $1, last_published_date = $2 WHERE publisher_id = $3",
 				newVolumeNumber, body.PublicationDate, body.PublisherID,

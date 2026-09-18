@@ -17,11 +17,13 @@ func TestNextVolumeNumber(t *testing.T) {
 	}{
 		{"daily, next consecutive day", "Daily", 67, "2026-08-13", "2026-08-14", 68, true},
 		{"daily, one day skipped", "Daily", 67, "2026-08-13", "2026-08-15", 69, true},
-		{"daily, same day regenerate", "Daily", 67, "2026-08-14", "2026-08-14", 68, true},
+		{"daily, same day regenerate keeps volume", "Daily", 67, "2026-08-14", "2026-08-14", 67, true},
+		{"daily, earlier date keeps volume", "Daily", 67, "2026-08-14", "2026-08-12", 67, true},
+		{"daily, same day many regenerates still same", "Daily", 272, "2026-09-18", "2026-09-18", 272, true},
 		{"daily, several days skipped", "Daily", 100, "2026-08-01", "2026-08-10", 109, true},
 		{"weekly, one week later", "Weekly", 10, "2026-08-01", "2026-08-08", 11, true},
 		{"weekly, two weeks later (one skipped)", "Weekly", 10, "2026-08-01", "2026-08-15", 12, true},
-		{"weekly, mid-week regenerate (less than a week)", "Weekly", 10, "2026-08-01", "2026-08-03", 11, true},
+		{"weekly, mid-week regenerate (less than a week)", "Weekly", 10, "2026-08-01", "2026-08-03", 10, true},
 		{"no baseline set yet", "Daily", 0, "", "2026-08-14", 0, false},
 	}
 

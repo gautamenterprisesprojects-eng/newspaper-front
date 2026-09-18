@@ -659,7 +659,7 @@ export default function PublisherDashboard() {
           <label className="block text-xs font-semibold text-gray-700 mb-1.5">प्रकाशन तारीख</label>
           <input type="date" value={publicationDate} onChange={(e) => setPublicationDate(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black" />
           {volumeNumber !== null && (
-            <p className="mt-1.5 text-xs text-gray-500">पिछला अंक: Volume {volumeNumber} — अगला अंक बनाने पर यह अपने आप बढ़ेगा।</p>
+            <p className="mt-1.5 text-xs text-gray-500">पिछला अंक: Volume {volumeNumber} — नई प्रकाशन तारीख़ पर यह अपने आप बढ़ेगा (उसी दिन दोबारा बनाने पर नहीं)।</p>
           )}
         </div>
         {editions.length > 1 && (
