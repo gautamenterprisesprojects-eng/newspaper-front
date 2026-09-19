@@ -223,6 +223,7 @@ export default function PublisherDashboard() {
   const [ratePerPage, setRatePerPage] = useState<number>(50);
   const [issueNumber, setIssueNumber] = useState("");
   const [publicationDate, setPublicationDate] = useState(today());
+  const [dailyThought, setDailyThought] = useState("");
   const [checking, setChecking] = useState<GenerateMode | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showPagePicker, setShowPagePicker] = useState(false);
@@ -387,6 +388,7 @@ export default function PublisherDashboard() {
       mode,
       issueNumber: finalIssueNumber,
       publicationDate: publicationDate || today(),
+      dailyThought,
       returnUrl: `${window.location.origin}/dashboard?generated=1`,
       apiBase: API_BASE,
       authToken: getToken() || "",
@@ -661,6 +663,18 @@ export default function PublisherDashboard() {
           {volumeNumber !== null && (
             <p className="mt-1.5 text-xs text-gray-500">पिछला अंक: Volume {volumeNumber} — नई प्रकाशन तारीख़ पर यह अपने आप बढ़ेगा (उसी दिन दोबारा बनाने पर नहीं)।</p>
           )}
+        </div>
+        <div className="sm:col-span-2">
+          <label className="block text-xs font-semibold text-gray-700 mb-1.5">आज का सुविचार (वैकल्पिक)</label>
+          <textarea
+            value={dailyThought}
+            onChange={(e) => setDailyThought(e.target.value)}
+            maxLength={140}
+            rows={2}
+            placeholder="जैसे: खुद को खोजने का सबसे अच्छा तरीका है, दूसरों की सेवा में खुद को खो देना। — महात्मा गांधी"
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
+          />
+          <p className="mt-1.5 text-xs text-gray-500">खाली छोड़ने पर मास्टहेड का मौजूदा सुविचार वैसा ही रहेगा।</p>
         </div>
         {editions.length > 1 && (
           <div className="sm:col-span-2">
