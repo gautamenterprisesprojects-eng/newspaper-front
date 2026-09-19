@@ -107,6 +107,7 @@ func main() {
 	pub.Get("/issue-used-articles/:publisher_id", handlers.SaaSGetIssueUsedArticles)
 	pub.Post("/masthead-teasers", handlers.SaaSSaveMastheadTeasers)
 	pub.Get("/masthead-teasers/:publisher_id", handlers.SaaSGetMastheadTeasers)
+	pub.Post("/daily-thought", handlers.SaaSSaveDailyThought)
 	pub.Post("/youth-update-inside-author", handlers.SaaSSaveYouthUpdateInsideAuthor)
 	pub.Get("/youth-update-inside-author/:publisher_id", handlers.SaaSGetYouthUpdateInsideAuthor)
 	pub.Post("/generator/launch-token", handlers.SaaSGeneratorLaunchToken)

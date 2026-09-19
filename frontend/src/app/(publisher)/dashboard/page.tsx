@@ -224,6 +224,7 @@ export default function PublisherDashboard() {
   const [issueNumber, setIssueNumber] = useState("");
   const [publicationDate, setPublicationDate] = useState(today());
   const [dailyThought, setDailyThought] = useState("");
+  const [dailyThoughtStatus, setDailyThoughtStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [checking, setChecking] = useState<GenerateMode | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [showPagePicker, setShowPagePicker] = useState(false);
@@ -287,6 +288,7 @@ export default function PublisherDashboard() {
         if (Array.isArray(d?.page_sections) && d.page_sections.length) setPageSections(d.page_sections);
         if (Array.isArray(d?.editions) && d.editions.length) setEditions(d.editions);
         if (d?.last_volume_number !== undefined && d?.last_volume_number !== null) setVolumeNumber(Number(d.last_volume_number));
+        if (typeof d?.daily_thought === "string") setDailyThought(d.daily_thought);
       })
       .catch(() => {});
     apiFetch("/auth/pricing")
@@ -294,6 +296,21 @@ export default function PublisherDashboard() {
       .then((d) => d?.per_page_cost_inr && setRatePerPage(Number(d.per_page_cost_inr)))
       .catch(() => {});
   }, [router]);
+
+  const saveDailyThought = async () => {
+    const publisherId = getPublisherId();
+    if (!publisherId) return;
+    setDailyThoughtStatus("saving");
+    try {
+      const res = await apiFetch("/publisher/daily-thought", {
+        method: "POST",
+        body: JSON.stringify({ publisher_id: publisherId, daily_thought: dailyThought }),
+      });
+      setDailyThoughtStatus(res.ok ? "saved" : "error");
+    } catch {
+      setDailyThoughtStatus("error");
+    }
+  };
 
   const choosePageNumber = (pageNumber: number) => {
     setSelectedPageNumber(pageNumber);
@@ -668,13 +685,28 @@ export default function PublisherDashboard() {
           <label className="block text-xs font-semibold text-gray-700 mb-1.5">आज का सुविचार (वैकल्पिक)</label>
           <textarea
             value={dailyThought}
-            onChange={(e) => setDailyThought(e.target.value)}
+            onChange={(e) => {
+              setDailyThought(e.target.value);
+              setDailyThoughtStatus("idle");
+            }}
             maxLength={140}
             rows={2}
             placeholder="जैसे: खुद को खोजने का सबसे अच्छा तरीका है, दूसरों की सेवा में खुद को खो देना। — महात्मा गांधी"
             className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-black"
           />
-          <p className="mt-1.5 text-xs text-gray-500">खाली छोड़ने पर मास्टहेड का मौजूदा सुविचार वैसा ही रहेगा।</p>
+          <div className="mt-1.5 flex items-center gap-3">
+            <button
+              type="button"
+              onClick={saveDailyThought}
+              disabled={dailyThoughtStatus === "saving"}
+              className="rounded-lg bg-black px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+            >
+              {dailyThoughtStatus === "saving" ? "सेव हो रहा है…" : "सुविचार सेव करें"}
+            </button>
+            {dailyThoughtStatus === "saved" && <span className="text-xs font-medium text-green-600">सेव हो गया</span>}
+            {dailyThoughtStatus === "error" && <span className="text-xs font-medium text-red-600">सेव नहीं हुआ, दोबारा कोशिश करें</span>}
+          </div>
+          <p className="mt-1.5 text-xs text-gray-500">खाली छोड़ने पर मास्टहेड का मौजूदा सुविचार वैसा ही रहेगा। सेव किया हुआ सुविचार अगली बार अपने आप दिख जाएगा।</p>
         </div>
         {editions.length > 1 && (
           <div className="sm:col-span-2">

@@ -1095,6 +1095,38 @@ func SaaSGetMastheadTeasers(c *fiber.Ctx) error {
 	return c.JSON(fiber.Map{"teasers": teasers})
 }
 
+// SaaSSaveDailyThought persists the publisher's masthead "सुविचार" free
+// text. Deliberately its own always-editable endpoint rather than folded
+// into SaaSSaveSettings -- a suvichar changes per issue, and that endpoint
+// locks after its first save.
+func SaaSSaveDailyThought(c *fiber.Ctx) error {
+	var body struct {
+		PublisherID  string `json:"publisher_id"`
+		DailyThought string `json:"daily_thought"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(400).JSON(fiber.Map{"error": "Invalid suvichar payload."})
+	}
+
+	publisherID, ok := authorizedPublisherID(c, body.PublisherID)
+	if !ok {
+		return nil // rejection response already written
+	}
+
+	if database.DB == nil {
+		return c.JSON(fiber.Map{"success": true})
+	}
+
+	if _, err := database.DB.Exec(
+		"UPDATE publisher_profiles SET daily_thought = $1, updated_at = NOW() WHERE publisher_id = $2",
+		strings.TrimSpace(body.DailyThought), publisherID,
+	); err != nil {
+		return c.Status(500).JSON(fiber.Map{"error": "Failed saving suvichar: " + err.Error()})
+	}
+
+	return c.JSON(fiber.Map{"success": true})
+}
+
 type YouthUpdateInsideAuthorInput struct {
 	SlotIndex   int    `json:"slot_index" db:"slot_index"`
 	ImageURL    string `json:"image_url" db:"image_url"`
